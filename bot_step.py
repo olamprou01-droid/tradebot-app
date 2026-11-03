@@ -16,9 +16,9 @@ bot.GH_TOKEN = ""                                    # the workflow commits the 
 review.LEDGER, review.OUT_MD, review.OUT_JSON = d / "ledger.csv", d / "strategy_performance.md", d / "review.json"
 
 st = bot.load_state()
-first = not (d / "bot_state.json").exists()
-if first:
+if not st.get("announced_cloud"):
     bot.notify("☁️ TradeBot now runs in the cloud", f"{bot.STRATEGY} on {','.join(bot.PAIRS)} · paper · risk {bot.RISK*100:.2f}% · every ~10 min, no PC needed.", tags="robot")
+    st["announced_cloud"] = True
 t0 = time.time()
 bot.step(st, first=True)                             # force=True publishes every run (the workflow commits only if something changed)
 bot.log(f"cloud step done in {time.time()-t0:.0f}s · equity {st['equity']:.2f} · open {len(st['open'])} · pending {bool(st['pending'])} · "
