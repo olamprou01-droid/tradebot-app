@@ -10,7 +10,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: research branch (history cache + reports)
@@ -21,20 +21,30 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -q -r requirements.txt
-      - name: download history 2018 →
+      - name: download history 2018 -
         env:
           HISTORY_DIR: research_branch/data
           HISTORY_START: "2018-01-01"
-        run: python fetch_history.py
-      - name: strategy × coin comparison and challenge replay
-        env:
-          DATA_DIR: research_branch/data
-        run: |
-          python compare.py XBTUSD ETHUSD SOLUSD LINKUSD XRPUSD ADAUSD AVAXUSD DOTUSD LTCUSD XDGUSD > /dev/null; cp compare_report.md research_branch/compare_report_2018.md
-          python attempts.py research_branch/data --out research_branch/attempts_report_2018.md
-      - name: save
+        run: python fetch_history.py 2>&1 | tail -40
+      - name: save data
         run: |
           cd research_branch
           git config user.name tradebot && git config user.email tradebot@users.noreply.github.com
-          git add -A && git commit -qm "research $(date -u +%FT%TZ)" || echo "no change"
+          git add -A && git commit -qm "research data $(date -u +%FT%TZ)" || echo "no change"
           git push -u origin research
+      - name: analysis
+        env:
+          DATA_DIR: research_branch/data
+        run: |
+          set +e
+          { echo "== compare"; python compare.py XBTUSD ETHUSD SOLUSD LINKUSD XRPUSD ADAUSD AVAXUSD DOTUSD LTCUSD XDGUSD; echo "exit $?"; } > research_branch/research_log.txt 2>&1
+          cp compare_report.md research_branch/compare_report_2018.md 2>/dev/null
+          { echo "== attempts"; python attempts.py research_branch/data --out research_branch/attempts_report_2018.md; echo "exit $?"; } >> research_branch/research_log.txt 2>&1
+          tail -30 research_branch/research_log.txt
+          true
+      - name: save reports
+        if: always()
+        run: |
+          cd research_branch
+          git add -A && git commit -qm "research reports $(date -u +%FT%TZ)" || echo "no change"
+          git push -u origin research || true
