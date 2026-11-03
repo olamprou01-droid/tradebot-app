@@ -103,7 +103,7 @@ def _dedupe(trades):
 
 
 def walk_trail(df, i, stop, atr_mult, time_stop):
-    """chandelier exit: stop trails highest close - atr_mult*ATR; never moves down."""
+    """chandelier exit: stop trails highest close − atr_mult×ATR; never moves down."""
     o, h, l, c, a = df.open.values, df.high.values, df.low.values, df.close.values, df.atr.values
     n = len(df); entry = o[i + 1] * (1 + SLIP); hi = c[i]
     for j in range(i + 1, min(n, i + 1 + time_stop)):
@@ -114,7 +114,7 @@ def walk_trail(df, i, stop, atr_mult, time_stop):
 
 
 def s4_trend_trail(pair, p=None):
-    """4H Donchian-20 breakout in daily uptrend, 2xATR initial stop, 3xATR chandelier trail, no fixed target."""
+    """4H Donchian-20 breakout in daily uptrend, 2×ATR initial stop, 3×ATR chandelier trail, no fixed target."""
     p = dict(dict(don=20, atr_mult=2.0, trail=3.0, vol_mult=1.0, time_stop=180, max_r_pct=0.08), **(p or {}))
     df = load_tf(pair, 240); hh = df.high.rolling(p["don"]).max().shift(1)
     out = []
@@ -123,12 +123,13 @@ def s4_trend_trail(pair, p=None):
         stop_dist = p["atr_mult"] * df.atr[i]; entry_est = df.open[i + 1] * (1 + SLIP)
         if stop_dist / entry_est > p["max_r_pct"]: continue
         entry, ex, ei, why = walk_trail(df, i, entry_est - stop_dist, p["trail"], p["time_stop"])
-        out.append(_rec(pair, df, i, entry, entry_est - stop_dist, float("nan"), ex, ei, why, 240, "trend_trail"))
+        out.append(dict(_rec(pair, df, i, entry, entry_est - stop_dist, float("nan"), ex, ei, why, 240, "trend_trail"),
+                        vol_ratio=float(df.volume[i] / df.vol20[i]) if df.vol20[i] else float("nan"), atr_pct=float(df.atr[i] / df.close[i] * 100)))
     return _dedupe(out)
 
 
 def s5_daily_trend(pair, p=None):
-    """Classic daily Donchian-20 entry, exit on 10-day low or 2xATR stop. Slow, few trades, the benchmark trend system."""
+    """Classic daily Donchian-20 entry, exit on 10-day low or 2×ATR stop. Slow, few trades, the benchmark trend system."""
     p = dict(dict(don=20, exit_don=10, atr_mult=2.0, time_stop=120, max_r_pct=0.12), **(p or {}))
     df = load_tf(pair, 1440); hh = df.high.rolling(p["don"]).max().shift(1); ll = df.low.rolling(p["exit_don"]).min().shift(1)
     o, h, l, c = df.open.values, df.high.values, df.low.values, df.close.values
