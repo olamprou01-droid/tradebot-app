@@ -1,0 +1,17 @@
+== compare
+python: can't open file '/home/runner/work/tradebot-app/tradebot-app/compare.py': [Errno 2] No such file or directory
+exit 2
+== attempts
+| base 0.25% | 2 | 2 | 0 | 100% | 1058 | nan | 104 | +6.7% after 143 trades |
+| base 0.50% | 9 | 6 | 3 | 67% | 403 | 88 | 37 | -1.2% after 7 trades |
+| ratchet 0.25→0.5→0.75% | 4 | 3 | 1 | 75% | 248 | 885 | 51 | +1.5% after 143 trades |
+| breadth ≥2 coins up, 0.25% | 2 | 2 | 0 | 100% | 1058 | nan | 86 | +7.1% after 130 trades |
+| breadth ≥2, ratchet | 3 | 3 | 0 | 100% | 750 | nan | 57 | +1.5% after 130 trades |
+| breadth ≥3, ratchet | 3 | 2 | 1 | 67% | 649 | 1425 | 63 | +1.2% after 46 trades |
+| don=30, 0.25% | 2 | 2 | 0 | 100% | 1058 | nan | 94 | +6.8% after 118 trades |
+| vol≥1.5×, 0.25% | 2 | 2 | 0 | 100% | 1058 | nan | 93 | +9.4% after 126 trades |
+| stop 1.5×ATR, 0.25% | 4 | 4 | 0 | 100% | 887 | nan | 98 | -2.6% after 14 trades |
+| trail 4×ATR, 0.25% | 4 | 3 | 1 | 75% | 401 | 421 | 46 | +7.8% after 119 trades |
+| don=30 + vol≥1.5 + ratchet, breadth≥2 | 2 | 2 | 0 | 100% | 1058 | nan | 70 | +6.9% after 97 trades |
+written research_branch/attempts_report_2018.md
+exit 0
