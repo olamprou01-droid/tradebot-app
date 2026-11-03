@@ -1,0 +1,37 @@
+name: tradebot
+on:
+  schedule:
+    - cron: "*/10 * * * *"      # every 10 minutes (GitHub may delay a few minutes at busy times)
+  workflow_dispatch:            # "Run workflow" button = run the bot now
+permissions:
+  contents: write
+concurrency:
+  group: tradebot
+  cancel-in-progress: false
+jobs:
+  step:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data_branch
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -q -r requirements.txt
+      - name: bot step
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'tradebot-eth-7k2m9x' }}
+        run: python bot_step.py data_branch
+      - name: save state
+        run: |
+          cd data_branch
+          git config user.name tradebot
+          git config user.email tradebot@users.noreply.github.com
+          git add -A
+          git commit -qm "bot $(date -u +%FT%TZ)" || echo "nothing changed"
+          git push
