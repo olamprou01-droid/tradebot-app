@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+live_data/
+app_data/
+cloud_state/
+data/
+state.json
