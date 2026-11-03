@@ -53,13 +53,14 @@ nav button{flex:1;background:none;border:0;color:var(--muted);font:500 11px inhe
 nav button.on{color:var(--blue)}nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px;font:inherit;min-height:70px}
 input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px;font:inherit}
+.ico{background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 7px;display:flex}
 .stale{background:rgba(239,83,80,.14);color:var(--dn);padding:8px 12px;border-radius:10px;font-size:13px;margin-bottom:12px}
 h2{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin:18px 0 8px}
 table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 4px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
 </style>
 </head>
 <body>
-<header><h1 id="title">TradeBot</h1><small id="upd">—</small></header>
+<header><h1 id="title">TradeBot</h1><span style="display:flex;align-items:center;gap:10px"><small id="upd">—</small><button class="ico" onclick="toast('refreshing…');load()" aria-label="refresh"><svg viewBox="0 0 24 24" width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button></span></header>
 <main id="main"></main>
 <nav>
  <button data-v="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10H3z"/></svg>Home</button>
@@ -92,7 +93,7 @@ async function load() {
     try { journal = await get("journal.json"); } catch (e) { journal = []; }
     try { review = await get("review.json"); } catch (e) { review = null; }
     try { ledger = parseCSV(await get("ledger.csv", "text")); } catch (e) { ledger = []; }
-    $("#upd").textContent = "updated " + ago(state.ts);
+    $("#upd").textContent = "bot ran " + ago(state.ts);
   } catch (e) { $("#upd").textContent = "no data: " + e.message; }
   render();
 }
@@ -110,17 +111,19 @@ function askTopic() {
   const t = prompt("ntfy topic (same one you subscribed to in the ntfy app):", topic || "");
   if (t) { topic = t.trim(); try { localStorage.setItem("ntfy_topic", topic); } catch (e) {} render(); }
 }
-function toast(m) { $("#upd").textContent = m; setTimeout(() => state && ($("#upd").textContent = "updated " + ago(state.ts)), 2500); }
+function toast(m) { $("#upd").textContent = m; setTimeout(() => state && ($("#upd").textContent = "bot ran " + ago(state.ts)), 2500); }
 
 function render() {
   const m = $("#main"); m.innerHTML = "";
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === view));
   if (!state) { m.innerHTML = `<div class="card muted">Waiting for the bot's first update…</div>`; return; }
-  if (Date.now() / 1000 - state.ts > 900) m.innerHTML += `<div class="stale">Bot has not reported for ${ago(state.ts)}. Check run_bot.bat on the PC.</div>`;
+  const runUrl = onPages ? `https://github.com/${repo}/actions/workflows/bot.yml` : null;
+  if (Date.now() / 1000 - state.ts > 1500) m.innerHTML += `<div class="stale">Bot has not reported for ${ago(state.ts)}.${runUrl ? ` <a style="color:var(--dn);font-weight:600" href="${runUrl}" target="_blank">Run it now ›</a>` : " Check run_bot.bat on the PC."}</div>`;
   ({ home, watch: watchView, journal: journalView, review: reviewView })[view](m);
 }
 
 function home(m) {
+  const runUrl = onPages ? `https://github.com/${repo}/actions/workflows/bot.yml` : null;
   const s = state, ret = (s.equity / s.start - 1) * 100, dd = (1 - s.equity / s.peak) * 100;
   const col = ret >= 0 ? "up" : ret <= -2 ? "dn" : "amber";
   const status = s.killed ? ["KILL LINE HIT", "bad"] : s.halted ? ["HALTED −2%", "bad"] : s.blocked ? [s.blocked.toUpperCase(), "bad"] : ["RUNNING · PAPER", "run"];
@@ -144,15 +147,19 @@ function home(m) {
       <div class="row"><button class="btn acc" onclick="ctl('accept:${p.id}')">Accept</button><button class="btn rej" onclick="ctl('reject:${p.id}')">Reject</button></div></div>`;
   }
   if (s.open.length) {
-    m.innerHTML += `<h2>Open</h2>` + s.open.map(o => `<div class="card"><div class="row"><b>${o.pair}</b><b class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl)} <small class="muted">${o.r ? sign((o.mark - o.entry) / o.r).replace(".00", "") + "R" : ""}</small></b></div>
-      <div class="kv"><div>Entry<b class="num">${px(o.entry)}</b></div><div>Stop (trailing)<b class="num dn">${px(o.stop)}</b></div><div>Mark<b class="num">${px(o.mark || o.entry)}</b></div></div>
-      <div class="note">size ${o.size} · risk $${fmt(o.max_loss, 0)} · ${o.bars || 0} bars · ${ago(o.ts_open)}</div></div>`).join("");
+    m.innerHTML += `<h2>Open · bot (paper)</h2>` + s.open.map(o => { const near = o.stop_dist_pct != null && o.stop_dist_pct <= 0.75; const Rn = o.R_now ?? ((o.mark - o.entry) / o.r);
+      return `<div class="card" ${near ? 'style="border-color:var(--amber)"' : ""}><div class="row"><b>${o.pair}${near ? ' <span class="badge watch">NEAR STOP</span>' : ""}</b><b class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl)} <small class="muted">${(Rn >= 0 ? "+" : "") + Rn.toFixed(2)}R</small></b></div>
+      <div class="kv"><div>Entry<b class="num">${px(o.entry)}</b></div><div>Stop (trailing)<b class="num dn">${px(o.stop)}</b></div><div>To stop<b class="num ${near ? "amber" : ""}">${o.stop_dist_pct != null ? o.stop_dist_pct.toFixed(2) + "%" : "—"}</b></div>
+      <div>Mark<b class="num">${px(o.mark || o.entry)}</b></div><div>Peak<b class="num">+${(o.peak_R || 0).toFixed(1)}R</b></div><div>Held<b class="num">${o.bars || 0} bars</b></div></div>
+      <div class="note">size ${o.size} · risk $${fmt(o.max_loss, 0)} · ${ago(o.ts_open)} · checkpoints hit: ${(o.milestones || []).map(x => "+" + x + "R").join(" ") || "none"}</div></div>`; }).join("");
   }
+  if (s.manual && s.manual.length) m.innerHTML += `<h2>Your real trades</h2>` + s.manual.map(t => `<div class="card" style="border-color:var(--blue)"><div class="row"><b>${t.pair} <small class="muted">@ ${px(t.entry)} · ${fmt(t.usd, 0)} USD</small></b><b class="num ${(t.upnl || 0) >= 0 ? "up" : "dn"}">${sign(t.upnl || 0)}</b></div>
+      <div class="note">${t.note || ""} · opened ${ago(t.ts_open)}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`).join("");
   if (s.shadow && s.shadow.length) m.innerHTML += `<h2>Vetoed · shadow-tracked</h2>` + s.shadow.map(o => `<div class="card"><div class="row"><span>${o.pair} <small class="muted">@ ${px(o.entry)}</small></span><span class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl || 0)}</span></div></div>`).join("");
   m.innerHTML += `<h2>Watchlist</h2><div class="card">` + Object.values(watch || {}).map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
       <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
   if (s.history.length) m.innerHTML += `<h2>Recent</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`;
-  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · <a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a></div>`;
+  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"}<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
 }
 
 function watchView(m) {
@@ -193,16 +200,45 @@ function drawChart(w) {
 function journalView(m) {
   const notes = {}; for (const j of journal) (notes[j.trade_id] = notes[j.trade_id] || []).push(j);
   const closed = ledger.filter(t => t.ts_close);
-  if (!closed.length && !journal.length) { m.innerHTML = `<div class="card muted">No trades yet. Every closed trade lands here with the bot's one-line read on it; tap one to add your own note.</div>`; return; }
+  m.innerHTML += `<div class="row" style="margin-bottom:12px"><button class="btn acc" onclick="openForm()">+ Add real trade</button></div><div id="noteBox"></div>`;
+  for (const t of (state.manual || [])) m.innerHTML += `<div class="card" style="border-color:var(--blue)"><div class="row"><b>${t.pair} <small class="muted">@ ${px(t.entry)} · ${fmt(t.usd, 0)} USD</small></b><b class="num ${(t.upnl || 0) >= 0 ? "up" : "dn"}">${sign(t.upnl || 0)}</b></div><div class="note">${t.note || ""}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`;
+  if (!closed.length && !journal.length) { m.innerHTML += `<div class="card muted">No closed trades yet. Every trade lands here with the bot's one-line read on it; tap one to add your own note.</div>`; return; }
   m.innerHTML += `<h2>Trades · ${closed.length}</h2><div class="card">` + closed.slice(0, 60).map(t => {
     const sh = (t.exit_reason || "").startsWith("shadow"), R = +t.R || 0;
-    return `<div class="trade" onclick="noteFor('${t.trade_id}')"><div><b>${t.pair.replace("USD", "")}</b> <span class="badge ${sh ? "off" : R >= 0 ? "run" : "bad"}">${sh ? "VETOED" : t.exit_reason.toUpperCase()}</span>
-      <div class="note">${t.ts_open.slice(5, 16).replace("T", " ")} → ${t.ts_close.slice(5, 16).replace("T", " ")} · ${px(+t.entry)} → ${px(+t.exit)} · ${t.bars_held} bars · vol ${t.vol_ratio}×</div>
+    const real = t.strategy === "manual";
+    return `<div class="trade" onclick="noteFor('${t.trade_id}')"><div><b>${t.pair.replace("USD", "")}</b> <span class="badge ${sh ? "off" : real ? "armed" : R >= 0 ? "run" : "bad"}">${sh ? "VETOED" : real ? "REAL · " + (+t.net_pnl >= 0 ? "PROFIT" : "LOSS") : t.exit_reason.toUpperCase()}</span>
+      <div class="note">${t.ts_open.slice(5, 16).replace("T", " ")} → ${t.ts_close.slice(5, 16).replace("T", " ")} · ${px(+t.entry)} → ${px(+t.exit)}${real ? ` · ${fmt(+t.size * +t.entry, 0)} USD` : ` · ${t.bars_held} bars · vol ${t.vol_ratio}×`}</div>
       ${(notes[t.trade_id] || []).map(n => `<div class="note ${n.by}">${n.by === "owner" ? "✎ " : ""}${n.note}</div>`).join("")}</div>
-      <div style="text-align:right"><b class="num ${R >= 0 ? "up" : "dn"}">${(R >= 0 ? "+" : "") + R.toFixed(1)}R</b><div class="note num">${sign(+t.net_pnl)}</div></div></div>`; }).join("") + `</div>`;
+      <div style="text-align:right"><b class="num ${+t.net_pnl >= 0 ? "up" : "dn"}">${real ? sign(+t.net_pnl) : (R >= 0 ? "+" : "") + R.toFixed(1) + "R"}</b><div class="note num">${real ? ((+t.exit / +t.entry - 1) * 100).toFixed(2) + "%" : sign(+t.net_pnl)}</div></div></div>`; }).join("") + `</div>`;
   const other = journal.filter(j => !closed.find(t => t.trade_id === j.trade_id)).slice(0, 15);
   if (other.length) m.innerHTML += `<h2>Live notes</h2><div class="card">` + other.map(n => `<div class="note ${n.by}">${n.ts.slice(5, 16).replace("T", " ")} · ${n.note}</div>`).join("") + `</div>`;
-  m.innerHTML += `<div id="noteBox"></div>`;
+}
+function openForm() {
+  const b = $("#noteBox"); if (!b) return;
+  const opts = (state.pairs || []).map(p => `<option>${p}</option>`).join("") + `<option>XBTUSD</option><option>OTHER</option>`;
+  b.innerHTML = `<div class="card" style="border-color:var(--blue)"><b>Real trade opened in the Kraken app</b>
+    <div class="kv" style="grid-template-columns:1fr 1fr"><div>Coin<select id="mp" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit">${opts}</select></div>
+    <div>Entry price<input id="mpx" inputmode="decimal" placeholder="e.g. 2274.5"></div><div>Size in USD<input id="musd" inputmode="decimal" placeholder="e.g. 800"></div><div>Note<input id="mnote" placeholder="why / what you saw"></div></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" onclick="$('#noteBox').innerHTML=''">Cancel</button><button class="btn acc" onclick="submitOpen()">Save</button></div></div>`;
+  b.scrollIntoView({ behavior: "smooth" });
+}
+function submitOpen() {
+  const pair = $("#mp").value, p = parseFloat($("#mpx").value), u = parseFloat($("#musd").value) || 0, n = ($("#mnote").value || "").replace(/:/g, " ");
+  if (!(p > 0)) { toast("enter the entry price"); return; }
+  ctl(`mopen:${pair}:${p}:${u}:${n}`); $("#noteBox").innerHTML = ""; toast("logged — appears after the next bot run");
+}
+function closeForm(id, pair) {
+  view = "journal"; render();
+  const b = $("#noteBox"); if (!b) return;
+  b.innerHTML = `<div class="card" style="border-color:var(--blue)"><b>Close ${pair} (${id})</b>
+    <div class="kv" style="grid-template-columns:1fr 1fr"><div>Exit price<input id="cpx" inputmode="decimal" placeholder="price you got"></div><div>Note<input id="cnote" placeholder="profit / loss, what happened"></div></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" onclick="$('#noteBox').innerHTML=''">Cancel</button><button class="btn rej" onclick="submitClose('${id}')">Close trade</button></div></div>`;
+  b.scrollIntoView({ behavior: "smooth" });
+}
+function submitClose(id) {
+  const p = parseFloat($("#cpx").value), n = ($("#cnote").value || "").replace(/:/g, " ");
+  if (!(p > 0)) { toast("enter the exit price"); return; }
+  ctl(`mclose:${id}:${p}:${n}`); $("#noteBox").innerHTML = ""; toast("closing — appears after the next bot run");
 }
 function noteFor(id) {
   const b = $("#noteBox"); if (!b) return;
