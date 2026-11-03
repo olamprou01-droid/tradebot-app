@@ -6,11 +6,11 @@ Honesty rules: indicators use closed candles only; entry at next 1H open; stop a
 checked on the bar's high/low; stop wins ties; costs on every fill; nothing is annualised
 from fewer than 20 trades without saying so.
 """
-import sys, pathlib, math, itertools, datetime as dt
+import os, sys, pathlib, math, itertools, datetime as dt
 import numpy as np, pandas as pd
 
 HERE = pathlib.Path(__file__).parent
-DATA = HERE / "data"
+DATA = pathlib.Path(os.getenv("DATA_DIR", HERE / "data"))
 PAIRS = ["XBTUSD", "ETHUSD"]
 ROUND = {"XBTUSD": 500.0, "ETHUSD": 50.0}
 START_EQ = 10_000.0
