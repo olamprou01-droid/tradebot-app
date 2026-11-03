@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: "*/10 * * * *"      # every 10 minutes (GitHub may delay a few minutes at busy times)
   workflow_dispatch:            # "Run workflow" button = run the bot now
+  repository_dispatch:
+    types: [run]                # API trigger (POST /dispatches) = run the bot now
 permissions:
   contents: write
 concurrency:
