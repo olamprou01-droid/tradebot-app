@@ -64,10 +64,13 @@ def log(msg):
     with open(LOG_F, "a", encoding="utf-8") as f: f.write(line + "\n")
 
 
+PRIO = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}
 def notify(title, msg, actions=None, priority="default", tags=""):
-    h = {"Title": title, "Priority": priority, "Tags": tags}
-    if actions: h["Actions"] = actions
-    try: requests.post(f"{NTFY}/{NTFY_TOPIC}", data=msg.encode("utf-8"), headers=h, timeout=10)
+    """ntfy JSON publish — UTF-8 safe (emoji in titles), actions as objects."""
+    body = {"topic": NTFY_TOPIC, "title": title, "message": msg, "priority": PRIO.get(priority, 3),
+            "tags": [t for t in tags.split(",") if t]}
+    if actions: body["actions"] = actions
+    try: requests.post(NTFY, json=body, timeout=10)
     except Exception as e: log(f"ntfy failed: {e}")
 
 
@@ -173,8 +176,8 @@ def make_proposal(st, sig):
 def push_proposal(p):
     body = (f"BUY {p['pair']} @ {P(p['entry'])}\nSTOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · trailing, no fixed TP\nsize {p['size']} = max loss ${p['max_loss']:.0f}\n"
             f"volume {p['vol_ratio']:.1f}× avg · ATR {p['atr_pct']:.1f}%\nNo answer in {PROPOSAL_TIMEOUT_MIN} min = accept (paper)")
-    actions = (f"http, ACCEPT, {NTFY}/{NTFY_CTL}, method=POST, body=accept:{p['id']}, clear=true; "
-               f"http, REJECT, {NTFY}/{NTFY_CTL}, method=POST, body=reject:{p['id']}, clear=true")
+    actions = [{"action": "http", "label": "ACCEPT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"accept:{p['id']}", "clear": True},
+               {"action": "http", "label": "REJECT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"reject:{p['id']}", "clear": True}]
     notify(f"📈 PROPOSAL · BUY {p['pair']} @ {P(p['entry'])}", body, actions=actions, priority="high", tags="chart_with_upwards_trend")
 
 
