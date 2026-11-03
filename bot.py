@@ -31,7 +31,8 @@ STATE_F, LEDGER_F, LOG_F, JOURNAL_F = HERE / "state.json", HERE / "trades_ledger
 STRATEGY = "S4 trend_trail"
 STRATEGY_TF_MIN = 240
 PAIRS = ["ETHUSD", "SOLUSD", "LINKUSD", "XRPUSD"]   # decision memo 2026-11-03 (compare_report.md)
-RISK = 0.0025                                       # 0.25% per trade — risk_management.md
+RISK = 0.005                                        # 0.5% per trade — decision memo §13 (2018-2026 replay)
+RISK_CUT_BELOW, RISK_CUT = -0.015, 0.0025           # below -1.5% on the attempt, risk drops to 0.25% to protect the 3% kill line
 START_EQUITY = config.FUNDED["start_equity"]
 LIMITS = dict(daily=0.010, weekly=0.015, halt=0.020, kill=0.030)
 MAX_OPEN = 2
@@ -160,14 +161,20 @@ def risk_check(st):
 
 
 # ---------------- proposals ----------------
+def risk_now(eq):
+    """0.5% normally; 0.25% once the attempt is more than 1.5% under water (replay 2018-26: fewer kills, same passes)."""
+    return RISK_CUT if eq / START_EQUITY - 1 < RISK_CUT_BELOW else RISK
+
+
 def make_proposal(st, sig):
     t = exchange.ticker(sig["pair"]); entry = t["ask"] * (1 + SLIP); stop = entry - sig["stop_dist"]; r = entry - stop
-    size = st["equity"] * RISK / r; size *= 1 - 2 * FEE * entry / r
+    risk = risk_now(st["equity"])
+    size = st["equity"] * risk / r; size *= 1 - 2 * FEE * entry / r
     size = round(size, exchange.asset_pair(sig["pair"])["lot_decimals"])
     if size <= 0 or r <= 0:
         log(f"proposal skipped {sig['pair']}: stop distance too small for the fee budget"); return None
     target = entry + sig["rr"] * r if sig["rr"] else None
-    return dict(id=uuid.uuid4().hex[:8], pair=sig["pair"], entry=entry, stop=stop, target=target, size=size, r=r,
+    return dict(id=uuid.uuid4().hex[:8], pair=sig["pair"], entry=entry, stop=stop, target=target, size=size, r=r, risk=risk,
                 max_loss=size * r + 2 * size * entry * FEE, signal=sig["signal"], regime=sig["regime"], atr=sig["atr"],
                 vol_ratio=sig["vol_ratio"], atr_pct=sig["atr"] / entry * 100,
                 created=time.time(), expires=time.time() + PROPOSAL_TIMEOUT_MIN * 60, decision=None)
@@ -353,7 +360,7 @@ def publish(st, force=False):
     global _last_pub
     files = {
         "state.json": json.dumps(dict(
-            ts=time.time(), strategy=STRATEGY, pairs=PAIRS, risk=RISK, start=START_EQUITY, equity=st["equity"], peak=st["peak"],
+            ts=time.time(), strategy=STRATEGY, pairs=PAIRS, risk=risk_now(st["equity"]), risk_base=RISK, start=START_EQUITY, equity=st["equity"], peak=st["peak"],
             day_pnl=st["day_pnl"], week_pnl=st["week_pnl"], limits=LIMITS, halted=st["halted"], killed=st["killed"], blocked=st.get("blocked", ""),
             pending=st["pending"], open=st["open"], shadow=st["shadow"], manual=st.get("manual", []), history=st["history"][:30], started=st["started"],
             mode=os.getenv("BOT_RUNTIME", "pc")), default=str),
