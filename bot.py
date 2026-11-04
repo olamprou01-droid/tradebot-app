@@ -213,6 +213,8 @@ def poll_control(st):
     """answers and notes from the phone (ntfy control topic)."""
     try:
         r = requests.get(f"{NTFY}/{NTFY_CTL}/json?poll=1&since={st['ctl_since']}", timeout=10)
+        n_msgs = sum(1 for l in r.text.splitlines() if '"event":"message"' in l.replace(" ", ""))
+        if n_msgs or os.getenv("BOT_RUNTIME") == "cloud": log(f"ctl poll since {iso(st['ctl_since'])[11:16]}Z: http {r.status_code}, {n_msgs} message(s)")
         for line in r.text.splitlines():
             m = json.loads(line)
             if m.get("event") != "message": continue
