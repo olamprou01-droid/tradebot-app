@@ -20,7 +20,7 @@ import os, csv, json, time, uuid, base64, hashlib, threading, pathlib, datetime 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import requests, pandas as pd
 import config, exchange
-import backtest as b, strategies as S
+import backtest as b, strategies as S, ported as PT
 
 HERE = pathlib.Path(__file__).parent
 LIVE = HERE / "live_data"; LIVE.mkdir(exist_ok=True)
@@ -28,14 +28,15 @@ OUT = HERE / "app_data"; OUT.mkdir(exist_ok=True)
 STATE_F, LEDGER_F, LOG_F, JOURNAL_F = HERE / "state.json", HERE / "trades_ledger.csv", HERE / "bot_log.txt", HERE / "journal.json"
 
 # ---------------- settings (edit here, nowhere else) ----------------
-STRATEGY = "S4 trend_trail"
+STRATEGY = "S4 trend_trail + S002 reversal"   # 4H trend breakout (trailing) + 1H oversold reversal (3% stop, ROI/sell-signal exit)
 STRATEGY_TF_MIN = 240
 PAIRS = ["ETHUSD", "SOLUSD", "LINKUSD", "XRPUSD"]   # decision memo 2026-11-03 (compare_report.md)
 RISK = 0.01                                         # 1% per trade in the EVALUATION — Intermediate plan (5% max DD), memo §14
 RISK_CUT_BELOW, RISK_CUT = -0.025, 0.005            # below -2.5% on the attempt, risk halves to 0.5%
 START_EQUITY = config.FUNDED["start_equity"]
 LIMITS = dict(daily=0.010, weekly=0.015, halt=0.040, kill=0.050)   # Kraken Intermediate: 5% max DD static, 3% daily
-MAX_OPEN = 2
+MAX_OPEN = 2                                        # across both strategies, one position per coin
+REV_STOP, REV_ROI_ANY, REV_ROI_AFTER1 = 0.03, 0.05, 0.01   # S002: fixed 3% stop; exit at +5% any time, +1% after 1 closed bar, or on its sell signal
 PROPOSAL_TIMEOUT_MIN = 30                   # cloud bot runs every ~10 min, so 3 chances to answer
 DON, ATR_MULT, TRAIL_ATR, TIME_STOP_BARS = 20, 2.0, 3.0, 180
 FUNDING_4H = 0.000055                       # Kraken Prop swap: 0.033%/day charged per 4h rollover, on notional
@@ -119,10 +120,14 @@ def build_watch(pair, live_px):
     atr = float(df.atr.iloc[i]); vol_ratio = float(df.volume.iloc[i] / df.vol20.iloc[i]) if df.vol20.iloc[i] else 0
     reg = bool(df.regime_up.iloc[i]); dist = (trig - live_px) / live_px
     status = "OFF" if not reg else ("ARMED" if dist <= 0.01 else "WATCH")
+    h1 = S.load_tf(pair, 60); j = len(h1) - 2
+    rsi1 = float(PT.rsi(h1.close).iloc[j]); sk = float(PT.stoch_slowk(h1).iloc[j]); bbl = float(PT.bb_lower(h1).iloc[j]); hm = int(PT.hammer(h1).iloc[j])
+    rev = dict(rsi=rsi1, conditions=int(rsi1 < 30) + int(sk < 20) + int(h1.close.iloc[j] < bbl) + int(hm == 100), of=4)
+    if rev["conditions"] >= 3 and status == "OFF": status = "REV"       # reversal setup nearly complete even though trend is down
     cs = df.iloc[-150:]
     don = df.high.rolling(DON).max().shift(1).iloc[-150:]
     return dict(pair=pair, px=live_px, regime_up=reg, trigger=trig, dist_pct=dist * 100, atr_pct=atr / live_px * 100,
-                vol_ratio=vol_ratio, status=status, stop_if_entered=live_px - ATR_MULT * atr,
+                vol_ratio=vol_ratio, status=status, stop_if_entered=live_px - ATR_MULT * atr, reversal=rev,
                 candles=[[int(r.ts), round(r.open, 6), round(r.high, 6), round(r.low, 6), round(r.close, 6), round(r.volume, 2)] for r in cs.itertuples()],
                 donchian=[[int(t), round(v, 6)] for t, v in zip(cs.ts, don) if v == v])
 
@@ -138,7 +143,19 @@ def signal_now(pair):
         return None
     atr = float(tf.atr.iloc[i])
     if ATR_MULT * atr / float(tf.close.iloc[i]) > 0.08: return None
-    return dict(pair=pair, stop_dist=ATR_MULT * atr, rr=None, atr=atr, vol_ratio=float(tf.volume.iloc[i] / tf.vol20.iloc[i]), signal="trend_trail", regime="up")
+    return dict(pair=pair, stop_dist=ATR_MULT * atr, rr=None, atr=atr, vol_ratio=float(tf.volume.iloc[i] / tf.vol20.iloc[i]), signal="trend_trail", regime="up", strat="S4")
+
+
+def signal_now_reversal(pair):
+    """S002 (community strategy, ported): last CLOSED 1H bar has RSI<30, slow stoch<20, close below lower Bollinger
+    and a hammer candle. Fixed 3% stop. No trend filter — it buys the washout."""
+    b.DATA = LIVE
+    h1 = S.load_tf(pair, 60); j = len(h1) - 2
+    buy, _ = PT.s002(h1)
+    if not bool(buy.iloc[j]): return None
+    px = float(h1.close.iloc[j]); atr = float(h1.atr.iloc[j])
+    return dict(pair=pair, stop_dist=px * REV_STOP, rr=None, atr=atr, vol_ratio=float(h1.volume.iloc[j] / h1.vol20.iloc[j]) if h1.vol20.iloc[j] else 1.0,
+                signal="reversal", regime="washout", strat="S002")
 
 
 # ---------------- risk ----------------
@@ -175,17 +192,18 @@ def make_proposal(st, sig):
         log(f"proposal skipped {sig['pair']}: stop distance too small for the fee budget"); return None
     target = entry + sig["rr"] * r if sig["rr"] else None
     return dict(id=uuid.uuid4().hex[:8], pair=sig["pair"], entry=entry, stop=stop, target=target, size=size, r=r, risk=risk,
-                max_loss=size * r + 2 * size * entry * FEE, signal=sig["signal"], regime=sig["regime"], atr=sig["atr"],
+                max_loss=size * r + 2 * size * entry * FEE, signal=sig["signal"], regime=sig["regime"], atr=sig["atr"], strat=sig.get("strat", "S4"),
                 vol_ratio=sig["vol_ratio"], atr_pct=sig["atr"] / entry * 100,
                 created=time.time(), expires=time.time() + PROPOSAL_TIMEOUT_MIN * 60, decision=None)
 
 
 def push_proposal(p):
-    body = (f"BUY {p['pair']} @ {P(p['entry'])}\nSTOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · trailing, no fixed TP\nsize {p['size']} = max loss ${p['max_loss']:.0f}\n"
+    kind = "REVERSAL · 1H washout, exit +1-5% or sell signal" if p.get("strat") == "S002" else "TREND · 4H breakout, trailing exit, no fixed TP"
+    body = (f"BUY {p['pair']} @ {P(p['entry'])}\nSTOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · {kind}\nsize {p['size']} = max loss ${p['max_loss']:.0f}\n"
             f"volume {p['vol_ratio']:.1f}× avg · ATR {p['atr_pct']:.1f}%\nNo answer in {PROPOSAL_TIMEOUT_MIN} min = accept (paper)")
     actions = [{"action": "http", "label": "ACCEPT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"accept:{p['id']}", "clear": True},
                {"action": "http", "label": "REJECT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"reject:{p['id']}", "clear": True}]
-    notify(f"📈 PROPOSAL · BUY {p['pair']} @ {P(p['entry'])}", body, actions=actions, priority="high", tags="chart_with_upwards_trend")
+    notify(f"{'🔄' if p.get('strat') == 'S002' else '📈'} PROPOSAL · BUY {p['pair']} @ {P(p['entry'])}", body, actions=actions, priority="high", tags="chart_with_upwards_trend")
 
 
 def poll_control(st):
@@ -236,14 +254,23 @@ def decide(st, decision, who):
 
 
 # ---------------- positions ----------------
-def mark_positions(st, bar_closed_pairs):
+def mark_positions(st, bar_closed_pairs, bar_closed_1h=()):
     for m in st.get("manual", []):
         try: m["mark"] = exchange.ticker(m["pair"])["bid"]; m["upnl"] = m["usd"] * (m["mark"] / m["entry"] - 1)
         except Exception as e: log(f"manual mark {m['pair']}: {e}")
     for lst in (st["open"], st["shadow"]):
         for pos in list(lst):
             t = exchange.ticker(pos["pair"]); bid = t["bid"]
-            if pos["pair"] in bar_closed_pairs:                   # trail updates on bar close only
+            rev_exit = None
+            if pos.get("strat") == "S002":
+                if pos["pair"] in bar_closed_1h:                   # reversal: evaluated on each closed 1H bar
+                    b.DATA = LIVE; h1 = S.load_tf(pos["pair"], 60); j = len(h1) - 2; c = float(h1.close.iloc[j])
+                    pos["bars"] = pos.get("bars", 0) + 1; gain = c / pos["entry"] - 1
+                    if gain >= REV_ROI_ANY or (pos["bars"] >= 1 and gain >= REV_ROI_AFTER1): rev_exit = ("roi", c)
+                    else:
+                        _, sell = PT.s002(h1)
+                        if bool(sell.iloc[j]): rev_exit = ("sell_signal", c)
+            elif pos["pair"] in bar_closed_pairs:                   # trend: trail updates on 4H bar close only
                 b.DATA = LIVE; tf = S.load_tf(pos["pair"], STRATEGY_TF_MIN); c, atr_now = float(tf.close.iloc[-2]), float(tf.atr.iloc[-2])
                 pos["bars"] = pos.get("bars", 0) + 1
                 pos["hi"] = max(pos["hi"], c); pos["stop"] = max(pos["stop"], pos["hi"] - TRAIL_ATR * atr_now)   # same as backtest walker
@@ -253,8 +280,9 @@ def mark_positions(st, bar_closed_pairs):
             if not pos.get("shadow"): position_alerts(pos, bid)
             reason = None
             if bid <= pos["stop"]: reason, px = "stop", pos["stop"] * (1 - SLIP)
+            elif rev_exit: reason, px = rev_exit[0], rev_exit[1] * (1 - SLIP)
             elif pos.get("target") and bid >= pos["target"]: reason, px = "target", pos["target"] * (1 - SLIP)
-            elif pos.get("bars", 0) >= TIME_STOP_BARS: reason, px = "time", bid * (1 - SLIP)
+            elif pos.get("strat") != "S002" and pos.get("bars", 0) >= TIME_STOP_BARS: reason, px = "time", bid * (1 - SLIP)
             if reason: close_position(st, pos, px, reason, shadow=pos.get("shadow", False))
 
 
@@ -273,7 +301,7 @@ def position_alerts(pos, bid):
     done = set(pos.get("milestones", []))
     for m in MILESTONES:
         if pos["R_now"] >= m and m not in done:
-            done.add(m); notify(f"🏁 {pair} +{m}R reached @ {P(bid)}", f"+{pos['upnl']:.0f} USD. No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so.", tags="checkered_flag")
+            done.add(m); notify(f"🏁 {pair} +{m}R reached @ {P(bid)}", f"+{pos['upnl']:.0f} USD. " + ("Reversal trade: it exits at +1% after the first closed hour, +5% any time, or on its sell signal — I will tell you." if pos.get("strat") == "S002" else f"No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so."), tags="checkered_flag")
     pos["milestones"] = sorted(done)
 
 
@@ -285,7 +313,7 @@ def close_position(st, pos, px, reason, shadow=False):
     if not shadow:
         st["equity"] += net; st["peak"] = max(st["peak"], st["equity"]); st["day_pnl"] += net; st["week_pnl"] += net
     ledger_write(dict(trade_id=pos["trade_id"], ts_open=iso(pos["ts_open"]), ts_close=iso(time.time()), pair=pos["pair"], side="long",
-                      strategy=STRATEGY, regime=pos["regime"], entry=round(pos["entry"], 6), exit=round(px, 6), stop=round(pos["stop"], 6),
+                      strategy=pos.get("strat", "S4"), regime=pos["regime"], entry=round(pos["entry"], 6), exit=round(px, 6), stop=round(pos["stop"], 6),
                       target=round(pos["target"], 6) if pos.get("target") else "", size=pos["size"], capital_at_risk=round(pos["max_loss"], 2),
                       fees=round(fees, 2), funding=round(funding, 2), gross_pnl=round(gross, 2), net_pnl=round(net, 2), return_pct=round(net / START_EQUITY * 100, 3),
                       signal=pos["signal"], exit_reason=("shadow_" if shadow else "") + reason, decision=pos["decision"],
@@ -471,24 +499,28 @@ def main():
 def step(st, first=False):
     """one full iteration; called every minute on the PC, every ~10 min in the cloud."""
     try:
-        blocked = risk_check(st); closed_now = []
+        blocked = risk_check(st); closed_now, closed_1h = [], []
         for pair in PAIRS:
             last_bar = refresh_history(pair); px = exchange.ticker(pair)["last"]
             st["watch"][pair] = build_watch(pair, px)
+            last_1h = int(pd.read_csv(LIVE / f"{pair}_60.csv").ts.iloc[-1])
+            sigs = []
             if st["last_bar"].get(pair) != last_bar:
-                st["last_bar"][pair] = last_bar; closed_now.append(pair)
-                sig = signal_now(pair)
-                if sig and not blocked and not st["pending"] and pair not in [o["pair"] for o in st["open"]] and len(st["open"]) < MAX_OPEN:
+                st["last_bar"][pair] = last_bar; closed_now.append(pair); sigs.append(signal_now(pair))
+            if st["last_bar"].get(pair + "_60") != last_1h:
+                st["last_bar"][pair + "_60"] = last_1h; closed_1h.append(pair); sigs.append(signal_now_reversal(pair))
+            for sig in [x for x in sigs if x]:
+                if not blocked and not st["pending"] and pair not in [o["pair"] for o in st["open"]] and len(st["open"]) < MAX_OPEN:
                     st["pending"] = make_proposal(st, sig)
                     if st["pending"]: push_proposal(st["pending"]); log(f"PROPOSAL {st['pending']}")
-                elif sig: log(f"signal on {pair} ignored (blocked={st.get('blocked')}, pending={bool(st['pending'])}, open={len(st['open'])})")
+                else: log(f"{sig['strat']} signal on {pair} ignored (blocked={st.get('blocked')}, pending={bool(st['pending'])}, open={len(st['open'])})")
             w = st["watch"][pair]
             if w["status"] == "ARMED" and not st.get(f"armed_{pair}"):
                 notify(f"👀 {pair} ARMED · {P(w['px'])} is {w['dist_pct']:.2f}% below trigger {P(w['trigger'])}", f"Daily trend UP · breakout level {P(w['trigger'])} · vol {w['vol_ratio']:.1f}× avg · stop would be {P(w['stop_if_entered'])}", tags="eyes")
             st[f"armed_{pair}"] = w["status"] == "ARMED"
         poll_control(st)
         if st["pending"] and time.time() > st["pending"]["expires"]: decide(st, "accept", "timeout")
-        mark_positions(st, closed_now)
+        mark_positions(st, closed_now, closed_1h)
         if now().strftime("%Y-%m-%d") != st.get("reviewed", ""):
             import review; review.main(); st["reviewed"] = now().strftime("%Y-%m-%d")
         save_state(st); publish(st, force=first)
