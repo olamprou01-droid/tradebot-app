@@ -34,7 +34,7 @@ PAIRS = ["ETHUSD", "SOLUSD", "LINKUSD", "XRPUSD"]   # decision memo 2026-11-03 (
 RISK = 0.01                                         # 1% per trade in the EVALUATION — Intermediate plan (5% max DD), memo §14
 RISK_CUT_BELOW, RISK_CUT = -0.025, 0.005            # below -2.5% on the attempt, risk halves to 0.5%
 START_EQUITY = config.FUNDED["start_equity"]
-LIMITS = dict(daily=0.010, weekly=0.015, halt=0.040, kill=0.050)   # Kraken Intermediate: 5% max DD static, 3% daily
+LIMITS = dict(daily=0.010, weekly=0.015, halt=0.050, kill=0.060, target=0.10)   # Kraken Prop STARTER: 10% target, 6% max DD static, 3% daily (memo §16)
 MAX_OPEN = 2                                        # across both strategies, one position per coin
 REV_STOP, REV_ROI_ANY, REV_ROI_AFTER1 = 0.03, 0.05, 0.01   # S002: fixed 3% stop; exit at +5% any time, +1% after 1 closed bar, or on its sell signal
 PROPOSAL_TIMEOUT_MIN = 30                   # cloud bot runs every ~10 min, so 3 chances to answer
@@ -191,7 +191,9 @@ def make_proposal(st, sig):
     if size <= 0 or r <= 0:
         log(f"proposal skipped {sig['pair']}: stop distance too small for the fee budget"); return None
     target = entry + sig["rr"] * r if sig["rr"] else None
+    notional = size * entry
     return dict(id=uuid.uuid4().hex[:8], pair=sig["pair"], entry=entry, stop=stop, target=target, size=size, r=r, risk=risk,
+                notional=notional, pct_of_account=notional / st["equity"] * 100,
                 max_loss=size * r + 2 * size * entry * FEE, signal=sig["signal"], regime=sig["regime"], atr=sig["atr"], strat=sig.get("strat", "S4"),
                 vol_ratio=sig["vol_ratio"], atr_pct=sig["atr"] / entry * 100,
                 created=time.time(), expires=time.time() + PROPOSAL_TIMEOUT_MIN * 60, decision=None)
@@ -199,7 +201,8 @@ def make_proposal(st, sig):
 
 def push_proposal(p):
     kind = "REVERSAL · 1H washout, exit +1-5% or sell signal" if p.get("strat") == "S002" else "TREND · 4H breakout, trailing exit, no fixed TP"
-    body = (f"BUY {p['pair']} @ {P(p['entry'])}\nSTOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · {kind}\nsize {p['size']} = max loss ${p['max_loss']:.0f}\n"
+    body = (f"BUY {p['pair']} @ {P(p['entry'])}\nORDER SIZE: {p['notional']:.0f} USD = {p['pct_of_account']:.1f}% of account ({p['size']} {p['pair'][:-3]})\n"
+            f"STOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · {kind}\nmax loss ${p['max_loss']:.0f}\n"
             f"volume {p['vol_ratio']:.1f}× avg · ATR {p['atr_pct']:.1f}%\nNo answer in {PROPOSAL_TIMEOUT_MIN} min = accept (paper)")
     actions = [{"action": "http", "label": "ACCEPT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"accept:{p['id']}", "clear": True},
                {"action": "http", "label": "REJECT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"reject:{p['id']}", "clear": True}]
@@ -244,7 +247,7 @@ def decide(st, decision, who):
     pos = dict(p, trade_id=p["id"], ts_open=time.time(), hi=p["entry"], bars=0, peak_R=0.0, decision=f"{decision}:{who}")
     if decision == "accept" and len(st["open"]) < MAX_OPEN and p["pair"] not in [o["pair"] for o in st["open"]]:
         st["open"].append(pos); log(f"OPEN {p['pair']} {p['size']} @ {P(p['entry'])} stop {P(p['stop'])} ({who})")
-        notify(f"🟢 OPENED {p['pair']} @ {P(p['entry'])}", f"size {p['size']} · set your STOP at {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%)\nI will tell you when price gets near it and when it moves up.", tags="white_check_mark")
+        notify(f"🟢 OPENED {p['pair']} @ {P(p['entry'])}", f"{p.get('notional', 0):.0f} USD ({p.get('pct_of_account', 0):.1f}% of account) · now place a STOP LOSS order at {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%)\nI will tell you when price gets near it and when to move it up.", tags="white_check_mark")
         journal_add(dict(ts=iso(time.time()), trade_id=p["id"], note=f"Opened {p['pair']} @ {P(p['entry'])} ({who}). Volume {p['vol_ratio']:.1f}× avg, ATR {p['atr_pct']:.1f}%.", by="bot"))
     else:
         pos["shadow"] = True; st["shadow"].append(pos)
@@ -296,7 +299,7 @@ def position_alerts(pos, bid):
     elif pos["stop_dist_pct"] > NEAR_STOP_PCT * 200: pos["near_alerted"] = False
     if pos["stop"] > pos.get("stop_alerted", pos["stop"]) + 0.25 * r:
         locked = (pos["stop"] - pos["entry"]) / r
-        notify(f"🔵 {pair} STOP MOVED UP → {P(pos['stop'])}", f"Move your stop to {P(pos['stop'])} ({locked:+.1f}R {'locked in' if locked > 0 else 'from entry'}). Price {P(bid)}.", tags="arrow_up")
+        notify(f"🔵 {pair} STOP MOVED UP → {P(pos['stop'])}", f"Edit your stop-loss order to {P(pos['stop'])} ({locked:+.1f}R {'locked in' if locked > 0 else 'from entry'}). Price {P(bid)}.", tags="arrow_up")
     pos.setdefault("stop_alerted", pos["stop"]); pos["stop_alerted"] = max(pos["stop_alerted"], pos["stop"])
     done = set(pos.get("milestones", []))
     for m in MILESTONES:
