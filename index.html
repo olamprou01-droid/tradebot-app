@@ -54,13 +54,14 @@ nav button.on{color:var(--blue)}nav svg{width:22px;height:22px;stroke:currentCol
 textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px;font:inherit;min-height:70px}
 input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:12px;font:inherit}
 .ico{background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 7px;display:flex}
+@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite}
 .stale{background:rgba(239,83,80,.14);color:var(--dn);padding:8px 12px;border-radius:10px;font-size:13px;margin-bottom:12px}
 h2{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin:18px 0 8px}
 table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 4px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
 </style>
 </head>
 <body>
-<header><h1 id="title">TradeBot</h1><span style="display:flex;align-items:center;gap:10px"><small id="upd">—</small><button class="ico" onclick="toast('refreshing…');load()" aria-label="refresh"><svg viewBox="0 0 24 24" width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button></span></header>
+<header><h1 id="title">TradeBot</h1><span style="display:flex;align-items:center;gap:10px"><small id="upd">—</small><button class="ico" id="rfbtn" onclick="load(true)" aria-label="refresh"><svg id="rficon" viewBox="0 0 24 24" width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button></span></header>
 <main id="main"></main>
 <nav>
  <button data-v="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10H3z"/></svg>Home</button>
@@ -87,14 +88,19 @@ async function get(name, type = "json") {
   if (!r.ok) throw new Error(name + " " + r.status);
   return type === "json" ? r.json() : r.text();
 }
-async function load() {
+let lastChecked = null;
+function stamp() { const t = lastChecked ? lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"; return (state ? "bot ran " + ago(state.ts) : "no data") + " · checked " + t; }
+async function load(manual) {
+  const ic = $("#rficon"); if (ic) ic.classList.add("spin");
   try {
-    [state, watch] = await Promise.all([get("state.json"), get("watch.json")]);
+    const [s, w] = await Promise.all([get("state.json"), get("watch.json")]);
+    state = s; watch = w; lastChecked = new Date();
     try { journal = await get("journal.json"); } catch (e) { journal = []; }
     try { review = await get("review.json"); } catch (e) { review = null; }
     try { ledger = parseCSV(await get("ledger.csv", "text")); } catch (e) { ledger = []; }
-    $("#upd").textContent = "bot ran " + ago(state.ts);
-  } catch (e) { $("#upd").textContent = "no data: " + e.message; }
+    $("#upd").textContent = stamp();
+  } catch (e) { $("#upd").textContent = "refresh failed: " + e.message + (lastChecked ? " · showing " + lastChecked.toLocaleTimeString() : ""); }
+  if (ic) ic.classList.remove("spin");
   render();
 }
 function parseCSV(t) {
@@ -111,7 +117,7 @@ function askTopic() {
   const t = prompt("ntfy topic (same one you subscribed to in the ntfy app):", topic || "");
   if (t) { topic = t.trim(); try { localStorage.setItem("ntfy_topic", topic); } catch (e) {} render(); }
 }
-function toast(m) { $("#upd").textContent = m; setTimeout(() => state && ($("#upd").textContent = "bot ran " + ago(state.ts)), 2500); }
+function toast(m) { $("#upd").textContent = m; setTimeout(() => ($("#upd").textContent = stamp()), 2500); }
 
 function render() {
   const m = $("#main"); m.innerHTML = "";
@@ -159,7 +165,7 @@ function home(m) {
   m.innerHTML += `<h2>Watchlist</h2><div class="card">` + Object.values(watch || {}).map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
       <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal setup " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
   if (s.history.length) m.innerHTML += `<h2>Recent</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`;
-  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"}<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
+  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v3<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
 }
 
 function watchView(m) {
@@ -260,7 +266,7 @@ function reviewView(m) {
 }
 
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { view = b.dataset.v; render(); window.scrollTo(0, 0); });
-load(); setInterval(load, 60000);
+load(); setInterval(() => load(false), 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
 </script>
 </body>
