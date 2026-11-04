@@ -28,6 +28,7 @@ jobs:
       - name: bot step
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'tradebot-eth-7k2m9x' }}
+          TEST_ALERT: ${{ github.event.client_payload.test || '' }}
         run: python bot_step.py data_branch
       - name: save state
         run: |
