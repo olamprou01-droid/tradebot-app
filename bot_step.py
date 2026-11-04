@@ -19,6 +19,18 @@ st = bot.load_state()
 if not st.get("announced_cloud"):
     bot.notify("☁️ TradeBot now runs in the cloud", f"{bot.STRATEGY} on {','.join(bot.PAIRS)} · paper · risk {bot.RISK*100:.2f}% · every ~10 min, no PC needed.", tags="robot")
     st["announced_cloud"] = True
+if os.getenv("TEST_ALERT"):
+    import selftest
+    head, body, fails = selftest.report(selftest.run())
+    bot.log(head); bot.log(body)
+    bot.notify(("✅ " if not fails else "❌ ") + head, body[:3800], priority="high" if fails else "default", tags="test_tube")
+    # one sample of every alert type, clearly marked TEST, so the phone channel is proven end to end
+    bot.notify("🧪 TEST · 📈 PROPOSAL · BUY ETHUSD @ 2,274.7", "TEST ONLY — not a real signal.\nORDER SIZE: 3245 USD = 32.5% of account (1.4267 ETH)\nSTOP 2,206.4 (-3.0%) · TREND · trailing exit\nmax loss $100",
+               actions=[{"action": "http", "label": "ACCEPT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "accept:testonly", "clear": True},
+                        {"action": "http", "label": "REJECT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "reject:testonly", "clear": True}], tags="chart_with_upwards_trend")
+    bot.notify("🧪 TEST · 🟡 ETHUSD NEAR STOP · 2,215.0 is 0.39% above 2,206.4", "TEST ONLY. Close at market if it trades through 2,206.4.", tags="warning")
+    bot.notify("🧪 TEST · 🔴 CLOSE ETHUSD NOW @ 2,206.4 · STOP", "TEST ONLY. stop hit · exit at market now", tags="small_red_triangle_down")
+    bot.log("test alerts sent")
 t0 = time.time()
 bot.step(st, first=True)                             # force=True publishes every run (the workflow commits only if something changed)
 bot.log(f"cloud step done in {time.time()-t0:.0f}s · equity {st['equity']:.2f} · open {len(st['open'])} · pending {bool(st['pending'])} · "
