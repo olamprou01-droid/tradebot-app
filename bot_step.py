@@ -19,7 +19,9 @@ st = bot.load_state()
 if not st.get("announced_cloud"):
     bot.notify("☁️ TradeBot now runs in the cloud", f"{bot.STRATEGY} on {','.join(bot.PAIRS)} · paper · risk {bot.RISK*100:.2f}% · every ~10 min, no PC needed.", tags="robot")
     st["announced_cloud"] = True
-if os.getenv("TEST_ALERT"):
+flag = d / "RUN_TEST"
+if os.getenv("TEST_ALERT") or flag.exists():
+    if flag.exists(): flag.unlink()
     import selftest
     head, body, fails = selftest.report(selftest.run())
     bot.log(head); bot.log(body)
