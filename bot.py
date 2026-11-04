@@ -218,6 +218,9 @@ def poll_control(st):
             if m.get("event") != "message": continue
             st["ctl_since"] = max(st["ctl_since"], int(m.get("time", 0)) + 1)
             msg = m.get("message", "").strip(); low = msg.lower()
+            log(f"phone -> bot: {msg[:80]}")
+            if low in ("accept:testonly", "reject:testonly"):
+                notify("✅ Your tap reached the bot", f"Received '{msg}' from your phone at {iso(int(m.get('time', time.time())))[11:16]} UTC. The ACCEPT/REJECT buttons work.", tags="white_check_mark"); continue
             p = st.get("pending")
             if (low.startswith("accept:") or low.startswith("reject:")) and p and low.split(":", 1)[1] == p["id"]:
                 decide(st, low.split(":")[0], "phone")
