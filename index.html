@@ -133,13 +133,13 @@ function home(m) {
   const s = state, ret = (s.equity / s.start - 1) * 100, dd = (1 - s.equity / s.peak) * 100;
   const col = ret >= 0 ? "up" : ret <= -2 ? "dn" : "amber";
   const status = s.killed ? ["KILL LINE HIT", "bad"] : s.halted ? [`HALTED −${(s.limits?.halt||0.02)*100}%`, "bad"] : s.blocked ? [s.blocked.toUpperCase(), "bad"] : ["RUNNING · PAPER", "run"];
-  const K = (s.limits && s.limits.kill ? s.limits.kill * 100 : 3), span = K + 12, pos = Math.min(100, Math.max(0, (ret + K) / span * 100));
+  const K = (s.limits && s.limits.kill ? s.limits.kill * 100 : 3), TG = (s.limits && s.limits.target ? s.limits.target * 100 : 12), span = K + TG, pos = Math.min(100, Math.max(0, (ret + K) / span * 100));
   m.innerHTML += `<div class="card">
     <div class="row"><span class="muted">Equity</span><span class="badge ${status[1]}">${status[0]}</span></div>
     <div class="big ${col}">$${fmt(s.equity, 0)}</div>
     <div class="row"><span class="${col} num">${sign(ret)}%</span><span class="muted num">dd ${fmt(dd, 2)}% · day ${sign(s.day_pnl)} · week ${sign(s.week_pnl)}</span></div>
     <div class="bar"><i style="left:0;width:${pos}%;background:${col === "up" ? "var(--up)" : col === "dn" ? "var(--dn)" : "var(--amber)"}"></i><i style="left:${K / span * 100}%;width:2px;background:#fff;opacity:.6"></i></div>
-    <div class="row muted" style="font-size:11px"><span>−${K}% kill</span><span>0</span><span>+12% pass</span></div>
+    <div class="row muted" style="font-size:11px"><span>−${K}% kill</span><span>0</span><span>+${TG}% pass</span></div>
     ${s.halted && !s.killed ? `<button class="btn ghost" style="margin-top:10px;width:100%" onclick="ctl('clearhalt')">Clear halt</button>` : ""}
   </div>`;
   const p = s.pending;
@@ -147,8 +147,9 @@ function home(m) {
     const left = Math.max(0, Math.round((p.expires - Date.now() / 1000) / 60));
     m.innerHTML += `<div class="card" style="border-color:var(--teal)">
       <div class="row"><b class="teal">PROPOSAL · ${p.pair} LONG</b><span class="muted">${left} min left</span></div>
+      <div class="card" style="background:var(--bg);margin:10px 0 6px;padding:10px 12px"><span class="muted" style="font-size:12px">ORDER TO PLACE</span><br><b class="num" style="font-size:22px">$${fmt(p.notional, 0)}</b> <span class="muted">= ${fmt(p.pct_of_account, 1)}% of account</span><br><small class="muted">${p.size} ${p.pair.replace("USD", "")} · then a stop-loss order at ${px(p.stop)}</small></div>
       <div class="kv"><div>Entry<b class="num">${px(p.entry)}</b></div><div>Stop<b class="num dn">${px(p.stop)}</b></div><div>Max loss<b class="num dn">$${fmt(p.max_loss, 0)}</b></div>
-      <div>Size<b class="num">${p.size}</b></div><div>Volume<b class="num">${fmt(p.vol_ratio, 1)}×</b></div><div>ATR<b class="num">${fmt(p.atr_pct, 1)}%</b></div></div>
+      <div>Type<b>${p.strat === "S002" ? "reversal" : "trend"}</b></div><div>Volume<b class="num">${fmt(p.vol_ratio, 1)}×</b></div><div>ATR<b class="num">${fmt(p.atr_pct, 1)}%</b></div></div>
       <p class="muted" style="font-size:13px;margin:10px 0">Trailing exit, no fixed target. Your call: news, macro, how it looks. No answer = accepted (paper).</p>
       <div class="row"><button class="btn acc" onclick="ctl('accept:${p.id}')">Accept</button><button class="btn rej" onclick="ctl('reject:${p.id}')">Reject</button></div></div>`;
   }
@@ -157,7 +158,7 @@ function home(m) {
       return `<div class="card" ${near ? 'style="border-color:var(--amber)"' : ""}><div class="row"><b>${o.pair}${near ? ' <span class="badge watch">NEAR STOP</span>' : ""}</b><b class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl)} <small class="muted">${(Rn >= 0 ? "+" : "") + Rn.toFixed(2)}R</small></b></div>
       <div class="kv"><div>Entry<b class="num">${px(o.entry)}</b></div><div>Stop (trailing)<b class="num dn">${px(o.stop)}</b></div><div>To stop<b class="num ${near ? "amber" : ""}">${o.stop_dist_pct != null ? o.stop_dist_pct.toFixed(2) + "%" : "—"}</b></div>
       <div>Mark<b class="num">${px(o.mark || o.entry)}</b></div><div>Peak<b class="num">+${(o.peak_R || 0).toFixed(1)}R</b></div><div>Held<b class="num">${o.bars || 0} bars</b></div></div>
-      <div class="note">size ${o.size} · risk $${fmt(o.max_loss, 0)} · ${ago(o.ts_open)} · checkpoints hit: ${(o.milestones || []).map(x => "+" + x + "R").join(" ") || "none"}</div></div>`; }).join("");
+      <div class="note">$${fmt(o.notional || o.size * o.entry, 0)} (${fmt(o.pct_of_account || (o.size * o.entry / s.equity * 100), 1)}%) · ${o.size} ${o.pair.replace("USD", "")} · risk $${fmt(o.max_loss, 0)} · ${o.strat === "S002" ? "reversal" : "trend"} · ${ago(o.ts_open)} · checkpoints: ${(o.milestones || []).map(x => "+" + x + "R").join(" ") || "none"}</div></div>`; }).join("");
   }
   if (s.manual && s.manual.length) m.innerHTML += `<h2>Your real trades</h2>` + s.manual.map(t => `<div class="card" style="border-color:var(--blue)"><div class="row"><b>${t.pair} <small class="muted">@ ${px(t.entry)} · ${fmt(t.usd, 0)} USD</small></b><b class="num ${(t.upnl || 0) >= 0 ? "up" : "dn"}">${sign(t.upnl || 0)}</b></div>
       <div class="note">${t.note || ""} · opened ${ago(t.ts_open)}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`).join("");
@@ -165,7 +166,7 @@ function home(m) {
   m.innerHTML += `<h2>Watchlist</h2><div class="card">` + Object.values(watch || {}).map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
       <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal setup " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
   if (s.history.length) m.innerHTML += `<h2>Recent</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`;
-  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v3<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
+  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v4<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
 }
 
 function watchView(m) {
