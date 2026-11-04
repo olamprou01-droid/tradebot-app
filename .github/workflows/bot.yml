@@ -1,10 +1,10 @@
 name: tradebot
 on:
   schedule:
-    - cron: "*/10 * * * *"      # every 10 minutes (GitHub may delay a few minutes at busy times)
+    - cron: "*/10 * * * *"      # GitHub's own timer (unreliable on new repos — the self-chain below is the primary clock)
   workflow_dispatch:            # "Run workflow" button = run the bot now
   repository_dispatch:
-    types: [run]                # API trigger (POST /dispatches) = run the bot now
+    types: [run]                # API trigger = run the bot now; each run re-triggers the next one (see last step)
 permissions:
   contents: write
 concurrency:
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   step:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -40,3 +40,10 @@ jobs:
             git push && break
             git fetch origin data && git rebase -X theirs origin/data || { git rebase --abort; git reset --hard origin/data; python ../bot_step.py . ; git add -A; git commit -qm "bot retry $(date -u +%FT%TZ)" || true; }
           done
+      - name: schedule next run (self-chain; does not depend on GitHub's cron)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          now=$(date +%s); next=$(( (now / 600 + 1) * 600 )); sleep $(( next - now ))
+          gh api "repos/${{ github.repository }}/dispatches" -f event_type=run && echo "next run requested"
