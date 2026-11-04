@@ -36,7 +36,7 @@ main{padding:12px 12px calc(var(--sab) + 76px)}
 .num{font-variant-numeric:tabular-nums}
 .badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.6px;padding:3px 8px;border-radius:6px;background:#2A2E39;color:var(--muted)}
 .badge.armed{background:rgba(0,188,212,.18);color:var(--teal)}.badge.watch{background:rgba(255,152,0,.16);color:var(--amber)}.badge.off{background:#2A2E39;color:var(--muted)}
-.badge.run{background:rgba(38,166,154,.18);color:var(--up)}.badge.bad{background:rgba(239,83,80,.18);color:var(--dn)}
+.badge.rev{background:rgba(41,98,255,.2);color:#6B9BFF}.badge.run{background:rgba(38,166,154,.18);color:var(--up)}.badge.bad{background:rgba(239,83,80,.18);color:var(--dn)}
 .bar{height:6px;background:#2A2E39;border-radius:3px;margin:10px 0 6px;position:relative;overflow:hidden}
 .bar i{position:absolute;top:0;bottom:0;border-radius:3px}
 .btn{flex:1;border:0;border-radius:10px;padding:14px;font:600 15px inherit;color:#fff;cursor:pointer}
@@ -157,7 +157,7 @@ function home(m) {
       <div class="note">${t.note || ""} · opened ${ago(t.ts_open)}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`).join("");
   if (s.shadow && s.shadow.length) m.innerHTML += `<h2>Vetoed · shadow-tracked</h2>` + s.shadow.map(o => `<div class="card"><div class="row"><span>${o.pair} <small class="muted">@ ${px(o.entry)}</small></span><span class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl || 0)}</span></div></div>`).join("");
   m.innerHTML += `<h2>Watchlist</h2><div class="card">` + Object.values(watch || {}).map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
-      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
+      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal setup " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
   if (s.history.length) m.innerHTML += `<h2>Recent</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`;
   m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"}<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
 }
@@ -169,7 +169,7 @@ function watchView(m) {
       <div class="row"><span class="big num" style="font-size:26px">${px(w.px)}</span><span class="num ${w.dist_pct <= 1 && w.dist_pct >= 0 ? "teal" : "muted"}" style="text-align:right">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% below trigger" : "above trigger"}<br><small class="muted">trigger ${px(w.trigger)}</small></span></div>
       <div class="chart" id="c_${w.pair}"></div>
       <div class="kv"><div>Daily trend<b class="${w.regime_up ? "up" : "dn"}">${w.regime_up ? "UP" : "DOWN · no trades"}</b></div><div>Volume (last bar)<b class="num">${fmt(w.vol_ratio, 1)}× avg</b></div><div>ATR<b class="num">${fmt(w.atr_pct, 1)}%</b></div>
-      <div>Stop if entered<b class="num">${px(w.stop_if_entered)}</b></div><div>Risk per trade<b class="num">$${fmt(state.equity * state.risk, 0)}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`;
+      <div>Reversal setup (1H)<b class="num ${w.reversal && w.reversal.conditions >= 3 ? "blue" : ""}">${w.reversal ? w.reversal.conditions + "/" + w.reversal.of + " · RSI " + w.reversal.rsi.toFixed(0) : "—"}</b></div><div>Risk per trade<b class="num">$${fmt(state.equity * state.risk, 0)}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`;
   }
   requestAnimationFrame(() => { for (const w of Object.values(watch || {})) drawChart(w); });
 }
