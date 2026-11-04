@@ -31,10 +31,10 @@ STATE_F, LEDGER_F, LOG_F, JOURNAL_F = HERE / "state.json", HERE / "trades_ledger
 STRATEGY = "S4 trend_trail"
 STRATEGY_TF_MIN = 240
 PAIRS = ["ETHUSD", "SOLUSD", "LINKUSD", "XRPUSD"]   # decision memo 2026-11-03 (compare_report.md)
-RISK = 0.005                                        # 0.5% per trade — decision memo §13 (2018-2026 replay)
-RISK_CUT_BELOW, RISK_CUT = -0.015, 0.0025           # below -1.5% on the attempt, risk drops to 0.25% to protect the 3% kill line
+RISK = 0.01                                         # 1% per trade in the EVALUATION — Intermediate plan (5% max DD), memo §14
+RISK_CUT_BELOW, RISK_CUT = -0.025, 0.005            # below -2.5% on the attempt, risk halves to 0.5%
 START_EQUITY = config.FUNDED["start_equity"]
-LIMITS = dict(daily=0.010, weekly=0.015, halt=0.020, kill=0.030)
+LIMITS = dict(daily=0.010, weekly=0.015, halt=0.040, kill=0.050)   # Kraken Intermediate: 5% max DD static, 3% daily
 MAX_OPEN = 2
 PROPOSAL_TIMEOUT_MIN = 30                   # cloud bot runs every ~10 min, so 3 chances to answer
 DON, ATR_MULT, TRAIL_ATR, TIME_STOP_BARS = 20, 2.0, 3.0, 180
@@ -150,7 +150,7 @@ def risk_check(st):
     if dd >= LIMITS["kill"] and not st["killed"]:
         st["killed"] = True; notify("KILL LINE HIT", f"Equity {st['equity']:.0f} is -{dd*100:.1f}% from start. The real account would be closed. Bot stopped.", priority="urgent", tags="skull")
     if dd >= LIMITS["halt"] and not st["halted"] and not st["killed"]:
-        st["halted"] = True; notify("HALT: 2% drawdown", "No new entries until you clear it in the app.", priority="high", tags="warning")
+        st["halted"] = True; notify(f"HALT: {LIMITS['halt']*100:.0f}% drawdown", f"1% left before the {LIMITS['kill']*100:.0f}% kill line. No new entries until you clear it in the app.", priority="high", tags="warning")
     reasons = []
     if st["killed"]: reasons.append("kill line")
     if st["halted"]: reasons.append("halted")
@@ -403,7 +403,7 @@ button.r{border-color:#f85149;color:#f85149}table{width:100%%;border-collapse:co
 def render(st):
     dd = 1 - st["equity"] / START_EQUITY; col = "g" if st["equity"] >= START_EQUITY else ("r" if dd > 0.02 else "a")
     body = f'<div class=box><span class=k>EQUITY</span> <span class="big {col}">{st["equity"]:,.0f}</span> <span class="{col}">{(st["equity"]/START_EQUITY-1)*100:+.2f}%</span>' \
-           f'<br><small>kill -3% · halt -2% · day {st["day_pnl"]:+.0f} · week {st["week_pnl"]:+.0f}' + (f' · <span class=r>blocked: {st["blocked"]}</span>' if st.get("blocked") else "") + '</small>'
+           f'<br><small>kill -5% · halt -4% · day {st["day_pnl"]:+.0f} · week {st["week_pnl"]:+.0f}' + (f' · <span class=r>blocked: {st["blocked"]}</span>' if st.get("blocked") else "") + '</small>'
     if st["halted"] and not st["killed"]: body += ' <form method=post action=/clear style="display:inline"><button>clear halt</button></form>'
     body += "</div>"
     p = st.get("pending")
