@@ -148,7 +148,7 @@ function watchTable(ws) {
   return `<table class="wl"><tr><th>Coin</th><th>Price</th><th>24h</th><th>7d (1H)</th><th>Status</th><th>Daily trend</th><th>To trigger</th><th>Vol</th><th>ATR</th><th>RSI 1H</th><th>Reversal</th></tr>` +
     ws.map(w => `<tr onclick="view='watch';render();window.scrollTo(0,0)"><td><b>${w.pair.replace("USD", "")}</b></td><td class="num">${px(w.px)}</td><td class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : "—"}</td><td>${sparkSVG(w.spark)}</td>
       <td><span class="badge ${w.status.toLowerCase()}">${w.status}</span></td><td class="${w.regime_up ? "up" : "dn"}">${w.regime_up ? "UP" : "DOWN"}</td><td class="num ${w.dist_pct >= 0 && w.dist_pct <= 1 ? "teal" : "muted"}">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "%" : "above"}</td>
-      <td class="num">${fmt(w.vol_ratio, 1)}×</td><td class="num">${fmt(w.atr_pct, 1)}%</td><td class="num ${w.reversal && w.reversal.rsi < 30 ? "blue" : ""}">${w.reversal ? w.reversal.rsi.toFixed(0) : "—"}</td><td>${dots(w.reversal && w.reversal.flags)} <small class="muted">${w.reversal ? w.reversal.conditions + "/4" : ""}</small></td></tr>`).join("") + `</table>`;
+      <td class="num">${fmt(w.vol_ratio, 1)}×</td><td class="num">${fmt(w.atr_pct, 1)}%</td><td class="num ${w.reversal && w.reversal.rsi < 30 ? "blue" : ""}">${w.reversal && w.reversal.rsi != null ? w.reversal.rsi.toFixed(0) : "—"}</td><td>${dots(w.reversal && w.reversal.flags)} <small class="muted">${w.reversal ? w.reversal.conditions + "/4" : ""}</small></td></tr>`).join("") + `</table>`;
 }
 function feed(s) {
   const ev = (s.alerts || []).slice().reverse();
@@ -161,7 +161,8 @@ function render() {
   if (!state) { m.innerHTML = `<div class="card muted">Waiting for the bot's first update…</div>`; return; }
   const runUrl = onPages ? `https://github.com/${repo}/actions/workflows/bot.yml` : null;
   if (Date.now() / 1000 - state.ts > 1500) m.innerHTML += `<div class="stale">Bot has not reported for ${ago(state.ts)}.${runUrl ? ` <a style="color:var(--dn);font-weight:600" href="${runUrl}" target="_blank">Run it now ›</a>` : " Check run_bot.bat on the PC."}</div>`;
-  ({ home, watch: watchView, journal: journalView, review: reviewView, rules: rulesView })[view](m);
+  try { ({ home, watch: watchView, journal: journalView, review: reviewView, rules: rulesView })[view](m); }
+  catch (e) { m.innerHTML += `<div class="stale">Display error on this screen: ${e.message}. Data is still being received — try Refresh; if it persists, tell Claude.</div>`; console.error(e); }
 }
 
 function home(m) {
@@ -208,10 +209,10 @@ function home(m) {
   if (s.shadow && s.shadow.length) put(L, `<h2>Vetoed · shadow-tracked</h2>` + s.shadow.map(o => `<div class="card"><div class="row"><span>${o.pair} <small class="muted">@ ${px(o.entry)}</small></span><span class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl || 0)}</span></div></div>`).join(""));
   const ws = Object.values(watch || {});
   put(Rc, `<h2 style="margin-top:${wide ? 0 : 18}px">Watchlist · ${ws.filter(w => w.status !== "OFF").length} active</h2><div class="card" style="overflow:auto">` + (wide ? watchTable(ws) : ws.map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
-      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("")) + `</div>`);
+      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal " + (w.reversal?.conditions ?? 0) + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("")) + `</div>`);
   put(Rc, `<h2>Alerts</h2><div class="card">${feed(s)}</div>`);
   if (s.history.length) put(Rc, `<h2>Decisions</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`);
-  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v6<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
+  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v7<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
 }
 
 function watchView(m) {
@@ -222,11 +223,12 @@ function watchView(m) {
       <div class="row"><span class="big num" style="font-size:26px">${px(w.px)}</span><span class="num ${w.dist_pct <= 1 && w.dist_pct >= 0 ? "teal" : "muted"}" style="text-align:right">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% below trigger" : "above trigger"}<br><small class="muted">trigger ${px(w.trigger)}</small></span></div>
       <div class="chart" id="c_${w.pair}"></div>
       <div class="kv"><div>Daily trend<b class="${w.regime_up ? "up" : "dn"}">${w.regime_up ? "UP" : "DOWN · no trades"}</b></div><div>Volume (last bar)<b class="num">${fmt(w.vol_ratio, 1)}× avg</b></div><div>ATR<b class="num">${fmt(w.atr_pct, 1)}%</b></div>
-      <div>Reversal setup (1H)<b class="num ${w.reversal && w.reversal.conditions >= 3 ? "blue" : ""}">${dots(w.reversal && w.reversal.flags)} ${w.reversal ? w.reversal.conditions + "/4 · RSI " + w.reversal.rsi.toFixed(0) + " · stoch " + w.reversal.stoch.toFixed(0) : "—"}</b></div><div>Daily EMA50<b class="num">${w.ema50_1d ? px(w.ema50_1d) : "—"}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`);
+      <div>Reversal setup (1H)<b class="num ${w.reversal && w.reversal.conditions >= 3 ? "blue" : ""}">${dots(w.reversal && w.reversal.flags)} ${w.reversal ? w.reversal.conditions + "/4 · RSI " + (w.reversal.rsi ?? 0).toFixed(0) + (w.reversal.stoch != null ? " · stoch " + w.reversal.stoch.toFixed(0) : "") : "—"}</b></div><div>Daily EMA50<b class="num">${w.ema50_1d ? px(w.ema50_1d) : "—"}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`);
   }
   requestAnimationFrame(() => { for (const w of Object.values(watch || {})) drawChart(w); });
 }
-function drawChart(w) {
+function drawChart(w) { try { drawChart_(w); } catch (e) { console.error("chart", w.pair, e); } }
+function drawChart_(w) {
   const el = document.getElementById("c_" + w.pair); if (!el || !window.LightweightCharts) return;
   const chart = LightweightCharts.createChart(el, { width: el.clientWidth, height: 220, layout: { background: { type: "solid", color: "#1E222D" }, textColor: "#787B86", fontFamily: "-apple-system, SF Pro Text, Helvetica Neue, sans-serif" },
     grid: { vertLines: { color: "#2A2E39" }, horzLines: { color: "#2A2E39" } }, rightPriceScale: { borderColor: "#2A2E39" }, timeScale: { borderColor: "#2A2E39", timeVisible: true }, handleScroll: { vertTouchDrag: false } });
