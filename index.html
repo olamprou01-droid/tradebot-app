@@ -90,7 +90,17 @@ table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 4px;bord
 const NTFY = "https://ntfy.sh";
 const onPages = location.hostname.endsWith("github.io");
 const repo = onPages ? location.hostname.split(".")[0] + "/" + location.pathname.split("/")[1] : null;
-const DATA = onPages ? `https://raw.githubusercontent.com/${repo}/data/` : "/data/";
+let dataSha = null, dataEtag = null;
+async function latestSha() {            // exact commit of the data branch -> fresh URL every bot run (raw CDN caches by path)
+  if (!onPages) return null;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/commits/data`, { headers: dataEtag ? { "If-None-Match": dataEtag } : {} });
+    if (r.status === 304) return dataSha;
+    if (!r.ok) return dataSha;
+    dataEtag = r.headers.get("ETag"); const j = await r.json(); dataSha = j.sha; return dataSha;
+  } catch (e) { return dataSha; }
+}
+const DATA = () => onPages ? `https://raw.githubusercontent.com/${repo}/${dataSha || "data"}/` : "/data/";
 let state = null, watch = null, ledger = [], journal = [], review = null, view = "home";
 let topic = ""; try { topic = localStorage.getItem("ntfy_topic") || ""; } catch (e) {}
 const charts = {};
@@ -101,7 +111,7 @@ const sign = n => (n >= 0 ? "+" : "") + fmt(n, 2);
 const ago = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 1 ? "just now" : m < 60 ? m + " min ago" : Math.round(m / 60) + " h ago"; };
 
 async function get(name, type = "json") {
-  const r = await fetch(DATA + name + "?t=" + Date.now(), { cache: "no-store" });
+  const r = await fetch(DATA() + name + "?t=" + Date.now(), { cache: "no-store" });
   if (!r.ok) throw new Error(name + " " + r.status);
   return type === "json" ? r.json() : r.text();
 }
@@ -109,6 +119,7 @@ let lastChecked = null;
 function stamp() { const t = lastChecked ? lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"; return (state ? "bot ran " + ago(state.ts) : "no data") + " · checked " + t; }
 async function load(manual) {
   const ic = $("#rficon"); if (ic) ic.classList.add("spin");
+  await latestSha();
   try {
     const [s, w] = await Promise.all([get("state.json"), get("watch.json")]);
     state = s; watch = w; lastChecked = new Date();
@@ -212,7 +223,7 @@ function home(m) {
       <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal " + (w.reversal?.conditions ?? 0) + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("")) + `</div>`);
   put(Rc, `<h2>Alerts</h2><div class="card">${feed(s)}</div>`);
   if (s.history.length) put(Rc, `<h2>Decisions</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`);
-  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v7<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
+  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v8<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
 }
 
 function watchView(m) {
@@ -327,7 +338,7 @@ function rulesView(m) {
   m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:12px">Rules change only after a replay proves the change and you approve it.</div>`;
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => { view = b.dataset.v; render(); window.scrollTo(0, 0); });
-load(); setInterval(() => load(false), 60000);
+load(); setInterval(() => load(false), 90000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
 </script>
 </body>
