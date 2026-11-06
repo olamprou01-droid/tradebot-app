@@ -67,7 +67,9 @@ def log(msg):
 
 
 PRIO = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}
+_alerts = []
 def notify(title, msg, actions=None, priority="default", tags=""):
+    _alerts.append(dict(ts=time.time(), title=title, msg=msg[:160], priority=priority))
     """ntfy JSON publish — UTF-8 safe (emoji in titles), actions as objects."""
     body = {"topic": NTFY_TOPIC, "title": title, "message": msg, "priority": PRIO.get(priority, 3),
             "tags": [t for t in tags.split(",") if t]}
@@ -122,12 +124,16 @@ def build_watch(pair, live_px):
     status = "OFF" if not reg else ("ARMED" if dist <= 0.01 else "WATCH")
     h1 = S.load_tf(pair, 60); j = len(h1) - 2
     rsi1 = float(PT.rsi(h1.close).iloc[j]); sk = float(PT.stoch_slowk(h1).iloc[j]); bbl = float(PT.bb_lower(h1).iloc[j]); hm = int(PT.hammer(h1).iloc[j])
-    rev = dict(rsi=rsi1, conditions=int(rsi1 < 30) + int(sk < 20) + int(h1.close.iloc[j] < bbl) + int(hm == 100), of=4)
+    c1 = float(h1.close.iloc[j]); d1 = pd.read_csv(LIVE / f"{pair}_1440.csv"); ema50d = float(b.ema(d1.close, 50).iloc[-2])
+    rev = dict(rsi=rsi1, stoch=sk, bb_lower=bbl, hammer=hm == 100, conditions=int(rsi1 < 30) + int(sk < 20) + int(c1 < bbl) + int(hm == 100), of=4,
+               flags=[rsi1 < 30, sk < 20, c1 < bbl, hm == 100])
+    chg24 = (c1 / float(h1.close.iloc[j - 24]) - 1) * 100 if j >= 24 else 0.0
+    spark = [round(float(x), 6) for x in h1.close.iloc[j - 167:j + 1]]
     if rev["conditions"] >= 3 and status == "OFF": status = "REV"       # reversal setup nearly complete even though trend is down
     cs = df.iloc[-150:]
     don = df.high.rolling(DON).max().shift(1).iloc[-150:]
     return dict(pair=pair, px=live_px, regime_up=reg, trigger=trig, dist_pct=dist * 100, atr_pct=atr / live_px * 100,
-                vol_ratio=vol_ratio, status=status, stop_if_entered=live_px - ATR_MULT * atr, reversal=rev,
+                vol_ratio=vol_ratio, status=status, stop_if_entered=live_px - ATR_MULT * atr, reversal=rev, chg24=chg24, ema50_1d=ema50d, spark=spark,
                 candles=[[int(r.ts), round(r.open, 6), round(r.high, 6), round(r.low, 6), round(r.close, 6), round(r.volume, 2)] for r in cs.itertuples()],
                 donchian=[[int(t), round(v, 6)] for t, v in zip(cs.ts, don) if v == v])
 
@@ -398,7 +404,7 @@ def publish(st, force=False):
         "state.json": json.dumps(dict(
             ts=time.time(), strategy=STRATEGY, pairs=PAIRS, risk=risk_now(st["equity"]), risk_base=RISK, start=START_EQUITY, equity=st["equity"], peak=st["peak"],
             day_pnl=st["day_pnl"], week_pnl=st["week_pnl"], limits=LIMITS, halted=st["halted"], killed=st["killed"], blocked=st.get("blocked", ""),
-            pending=st["pending"], open=st["open"], shadow=st["shadow"], manual=st.get("manual", []), history=st["history"][:30], started=st["started"],
+            pending=st["pending"], open=st["open"], shadow=st["shadow"], manual=st.get("manual", []), history=st["history"][:30], started=st["started"], alerts=st.get("alerts", [])[-40:],
             mode=os.getenv("BOT_RUNTIME", "pc")), default=str),
         "watch.json": json.dumps(st["watch"]),
         "journal.json": json.dumps(journal_load()[:200]),
@@ -529,6 +535,7 @@ def step(st, first=False):
         poll_control(st)
         if st["pending"] and time.time() > st["pending"]["expires"]: decide(st, "accept", "timeout")
         mark_positions(st, closed_now, closed_1h)
+        if _alerts: st["alerts"] = (st.get("alerts", []) + _alerts)[-80:]; _alerts.clear()
         if now().strftime("%Y-%m-%d") != st.get("reviewed", ""):
             import review; review.main(); st["reviewed"] = now().strftime("%Y-%m-%d")
         save_state(st); publish(st, force=first)
