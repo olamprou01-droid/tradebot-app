@@ -7,9 +7,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TradeBot">
 <meta name="theme-color" content="#131722">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
 <title>TradeBot</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131722'/%3E%3Cpath d='M12 44l12-14 10 8 18-22' stroke='%2326A69A' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23131722'/%3E%3Cpath d='M12 44l12-14 10 8 18-22' stroke='%2326A69A' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>/* lightweight-charts 4.2.0 (Apache-2.0, TradingView) inlined so the app works offline */
 /*!
  * @license
@@ -223,7 +225,7 @@ function home(m) {
       <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal " + (w.reversal?.conditions ?? 0) + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("")) + `</div>`);
   put(Rc, `<h2>Alerts</h2><div class="card">${feed(s)}</div>`);
   if (s.history.length) put(Rc, `<h2>Decisions</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`);
-  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v8<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
+  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v9<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
 }
 
 function watchView(m) {
