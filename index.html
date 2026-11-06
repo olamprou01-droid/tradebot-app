@@ -57,6 +57,22 @@ input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--t
 @keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite}
 .stale{background:rgba(239,83,80,.14);color:var(--dn);padding:8px 12px;border-radius:10px;font-size:13px;margin-bottom:12px}
 h2{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin:18px 0 8px}
+.grid{display:block}.col{min-width:0}
+.wl{width:100%;border-collapse:collapse;font-size:13px}.wl th{color:var(--muted);font-weight:500;text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+.wl td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}.wl tr:last-child td{border-bottom:0}.wl tr{cursor:pointer}.wl tr:hover td{background:rgba(255,255,255,.03)}
+.dots{display:inline-flex;gap:3px}.dots i{width:8px;height:8px;border-radius:50%;background:#2A2E39;display:inline-block}.dots i.on{background:#6B9BFF}
+.spark{width:110px;height:30px;display:block}
+.feed{max-height:420px;overflow:auto}.feed .ev{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}.feed .ev:last-child{border-bottom:0}.feed .t{color:var(--muted);flex:0 0 80px;font-variant-numeric:tabular-nums}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.kpi div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}.kpi b{display:block;color:var(--text);font-size:16px;font-variant-numeric:tabular-nums}
+@media(min-width:900px){
+ main{max-width:1500px;margin:0 auto;padding:16px 20px 90px}
+ .grid{display:grid;grid-template-columns:minmax(360px,440px) 1fr;gap:16px;align-items:start}
+ .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+ nav{position:sticky;top:0;bottom:auto;left:auto;right:auto;max-width:1500px;margin:0 auto;border-top:0;border-bottom:1px solid var(--line);padding:4px 8px;justify-content:flex-start;gap:4px}
+ nav button{flex:0 0 auto;flex-direction:row;padding:8px 14px;font-size:13px;border-radius:8px}nav button.on{background:rgba(41,98,255,.15)}
+ header{position:static}
+ body{display:flex;flex-direction:column}nav{order:-1}
+}
 table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px 4px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
 </style>
 </head>
@@ -120,6 +136,25 @@ function askTopic() {
 }
 function toast(m) { $("#upd").textContent = m; setTimeout(() => ($("#upd").textContent = stamp()), 2500); }
 
+function sparkSVG(vals, w = 110, h = 30) {
+  if (!vals || vals.length < 2) return "";
+  const mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (v - mn) / rng * (h - 4)).toFixed(1)}`).join(" ");
+  const up = vals[vals.length - 1] >= vals[0];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? "#26A69A" : "#EF5350"}" stroke-width="1.5"/></svg>`;
+}
+const dots = f => `<span class="dots">${(f || [0, 0, 0, 0]).map(x => `<i class="${x ? "on" : ""}"></i>`).join("")}</span>`;
+function watchTable(ws) {
+  return `<table class="wl"><tr><th>Coin</th><th>Price</th><th>24h</th><th>7d (1H)</th><th>Status</th><th>Daily trend</th><th>To trigger</th><th>Vol</th><th>ATR</th><th>RSI 1H</th><th>Reversal</th></tr>` +
+    ws.map(w => `<tr onclick="view='watch';render();window.scrollTo(0,0)"><td><b>${w.pair.replace("USD", "")}</b></td><td class="num">${px(w.px)}</td><td class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : "—"}</td><td>${sparkSVG(w.spark)}</td>
+      <td><span class="badge ${w.status.toLowerCase()}">${w.status}</span></td><td class="${w.regime_up ? "up" : "dn"}">${w.regime_up ? "UP" : "DOWN"}</td><td class="num ${w.dist_pct >= 0 && w.dist_pct <= 1 ? "teal" : "muted"}">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "%" : "above"}</td>
+      <td class="num">${fmt(w.vol_ratio, 1)}×</td><td class="num">${fmt(w.atr_pct, 1)}%</td><td class="num ${w.reversal && w.reversal.rsi < 30 ? "blue" : ""}">${w.reversal ? w.reversal.rsi.toFixed(0) : "—"}</td><td>${dots(w.reversal && w.reversal.flags)} <small class="muted">${w.reversal ? w.reversal.conditions + "/4" : ""}</small></td></tr>`).join("") + `</table>`;
+}
+function feed(s) {
+  const ev = (s.alerts || []).slice().reverse();
+  if (!ev.length) return `<div class="note">No alerts yet. Proposals, opens, stop moves and closes appear here as they are sent to your phone.</div>`;
+  return `<div class="feed">` + ev.map(e => `<div class="ev"><span class="t">${new Date(e.ts * 1000).toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span><b>${e.title}</b><div class="note">${e.msg.split("\n")[0]}</div></span></div>`).join("") + `</div>`;
+}
 function render() {
   const m = $("#main"); m.innerHTML = "";
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === view));
@@ -131,53 +166,63 @@ function render() {
 
 function home(m) {
   const runUrl = onPages ? `https://github.com/${repo}/actions/workflows/bot.yml` : null;
+  const wide = window.innerWidth >= 900;
+  m.innerHTML += `<div class="grid"><div class="col" id="leftcol"></div><div class="col" id="rightcol"></div></div>`;
+  const L = $("#leftcol"), Rc = $("#rightcol"); const put = (el, html) => el.insertAdjacentHTML("beforeend", html);
+  m = { set innerHTML(v) {}, get innerHTML() { return ""; } };  // legacy writes below go through put()
   const s = state, ret = (s.equity / s.start - 1) * 100, dd = (1 - s.equity / s.peak) * 100;
   const col = ret >= 0 ? "up" : ret <= -2 ? "dn" : "amber";
   const status = s.killed ? ["KILL LINE HIT", "bad"] : s.halted ? [`HALTED −${(s.limits?.halt||0.02)*100}%`, "bad"] : s.blocked ? [s.blocked.toUpperCase(), "bad"] : ["RUNNING · PAPER", "run"];
   const K = (s.limits && s.limits.kill ? s.limits.kill * 100 : 3), TG = (s.limits && s.limits.target ? s.limits.target * 100 : 12), span = K + TG, pos = Math.min(100, Math.max(0, (ret + K) / span * 100));
-  m.innerHTML += `<div class="card">
+  const openRisk = (s.open || []).reduce((t, o) => t + (o.max_loss || 0), 0), upnl = (s.open || []).reduce((t, o) => t + (o.upnl || 0), 0);
+  put(L, `<div class="card">
     <div class="row"><span class="muted">Equity</span><span class="badge ${status[1]}">${status[0]}</span></div>
     <div class="big ${col}">$${fmt(s.equity, 0)}</div>
     <div class="row"><span class="${col} num">${sign(ret)}%</span><span class="muted num">dd ${fmt(dd, 2)}% · day ${sign(s.day_pnl)} · week ${sign(s.week_pnl)}</span></div>
     <div class="bar"><i style="left:0;width:${pos}%;background:${col === "up" ? "var(--up)" : col === "dn" ? "var(--dn)" : "var(--amber)"}"></i><i style="left:${K / span * 100}%;width:2px;background:#fff;opacity:.6"></i></div>
     <div class="row muted" style="font-size:11px"><span>−${K}% kill</span><span>0</span><span>+${TG}% pass</span></div>
+    <div class="kpi"><div>Open positions<b>${(s.open || []).length} / 2</b></div><div>Risk on the table<b class="${openRisk ? "dn" : ""}">$${fmt(openRisk, 0)}</b></div><div>Open P&L<b class="${upnl >= 0 ? "up" : "dn"}">${sign(upnl)}</b></div>
+    <div>To pass<b>$${fmt(s.start * (1 + TG / 100) - s.equity, 0)}</b></div><div>To kill line<b class="amber">$${fmt(s.equity - s.start * (1 - K / 100), 0)}</b></div><div>Next trade risk<b>$${fmt(s.equity * s.risk, 0)}</b></div></div>
     ${s.halted && !s.killed ? `<button class="btn ghost" style="margin-top:10px;width:100%" onclick="ctl('clearhalt')">Clear halt</button>` : ""}
-  </div>`;
+  </div>`);
   const p = s.pending;
   if (p) {
     const left = Math.max(0, Math.round((p.expires - Date.now() / 1000) / 60));
-    m.innerHTML += `<div class="card" style="border-color:var(--teal)">
-      <div class="row"><b class="teal">PROPOSAL · ${p.pair} LONG</b><span class="muted">${left} min left</span></div>
+    put(L, `<div class="card" style="border-color:var(--teal)">
+      <div class="row"><b class="teal">PROPOSAL · ${p.pair} LONG · ${p.strat === "S002" ? "REVERSAL" : "TREND"}</b><span class="muted">${left} min left</span></div>
       <div class="card" style="background:var(--bg);margin:10px 0 6px;padding:10px 12px"><span class="muted" style="font-size:12px">ORDER TO PLACE</span><br><b class="num" style="font-size:22px">$${fmt(p.notional, 0)}</b> <span class="muted">= ${fmt(p.pct_of_account, 1)}% of account</span><br><small class="muted">${p.size} ${p.pair.replace("USD", "")} · then a stop-loss order at ${px(p.stop)}</small></div>
       <div class="kv"><div>Entry<b class="num">${px(p.entry)}</b></div><div>Stop<b class="num dn">${px(p.stop)}</b></div><div>Max loss<b class="num dn">$${fmt(p.max_loss, 0)}</b></div>
       <div>Type<b>${p.strat === "S002" ? "reversal" : "trend"}</b></div><div>Volume<b class="num">${fmt(p.vol_ratio, 1)}×</b></div><div>ATR<b class="num">${fmt(p.atr_pct, 1)}%</b></div></div>
-      <p class="muted" style="font-size:13px;margin:10px 0">Trailing exit, no fixed target. Your call: news, macro, how it looks. No answer = accepted (paper).</p>
-      <div class="row"><button class="btn acc" onclick="ctl('accept:${p.id}')">Accept</button><button class="btn rej" onclick="ctl('reject:${p.id}')">Reject</button></div></div>`;
+      <p class="muted" style="font-size:13px;margin:10px 0">Your call: news, macro, how it looks. No answer = accepted (paper).</p>
+      <div class="row"><button class="btn acc" onclick="ctl('accept:${p.id}')">Accept</button><button class="btn rej" onclick="ctl('reject:${p.id}')">Reject</button></div></div>`);
   }
   if (s.open.length) {
-    m.innerHTML += `<h2>Open · bot (paper)</h2>` + s.open.map(o => { const near = o.stop_dist_pct != null && o.stop_dist_pct <= 0.75; const Rn = o.R_now ?? ((o.mark - o.entry) / o.r);
-      return `<div class="card" ${near ? 'style="border-color:var(--amber)"' : ""}><div class="row"><b>${o.pair}${near ? ' <span class="badge watch">NEAR STOP</span>' : ""}</b><b class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl)} <small class="muted">${(Rn >= 0 ? "+" : "") + Rn.toFixed(2)}R</small></b></div>
+    put(L, `<h2>Open · bot (paper)</h2>` + s.open.map(o => { const near = o.stop_dist_pct != null && o.stop_dist_pct <= 0.75; const Rn = o.R_now ?? ((o.mark - o.entry) / o.r);
+      return `<div class="card" ${near ? 'style="border-color:var(--amber)"' : ""}><div class="row"><b>${o.pair}${near ? ' <span class="badge watch">NEAR STOP</span>' : ""} <small class="muted">${o.strat === "S002" ? "reversal" : "trend"}</small></b><b class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl)} <small class="muted">${(Rn >= 0 ? "+" : "") + Rn.toFixed(2)}R</small></b></div>
       <div class="kv"><div>Entry<b class="num">${px(o.entry)}</b></div><div>Stop (trailing)<b class="num dn">${px(o.stop)}</b></div><div>To stop<b class="num ${near ? "amber" : ""}">${o.stop_dist_pct != null ? o.stop_dist_pct.toFixed(2) + "%" : "—"}</b></div>
       <div>Mark<b class="num">${px(o.mark || o.entry)}</b></div><div>Peak<b class="num">+${(o.peak_R || 0).toFixed(1)}R</b></div><div>Held<b class="num">${o.bars || 0} bars</b></div></div>
-      <div class="note">$${fmt(o.notional || o.size * o.entry, 0)} (${fmt(o.pct_of_account || (o.size * o.entry / s.equity * 100), 1)}%) · ${o.size} ${o.pair.replace("USD", "")} · risk $${fmt(o.max_loss, 0)} · ${o.strat === "S002" ? "reversal" : "trend"} · ${ago(o.ts_open)} · checkpoints: ${(o.milestones || []).map(x => "+" + x + "R").join(" ") || "none"}</div></div>`; }).join("");
+      <div class="note">$${fmt(o.notional || o.size * o.entry, 0)} (${fmt(o.pct_of_account || (o.size * o.entry / s.equity * 100), 1)}%) · ${o.size} ${o.pair.replace("USD", "")} · risk $${fmt(o.max_loss, 0)} · ${ago(o.ts_open)} · checkpoints: ${(o.milestones || []).map(x => "+" + x + "R").join(" ") || "none"}</div></div>`; }).join(""));
   }
-  if (s.manual && s.manual.length) m.innerHTML += `<h2>Your real trades</h2>` + s.manual.map(t => `<div class="card" style="border-color:var(--blue)"><div class="row"><b>${t.pair} <small class="muted">@ ${px(t.entry)} · ${fmt(t.usd, 0)} USD</small></b><b class="num ${(t.upnl || 0) >= 0 ? "up" : "dn"}">${sign(t.upnl || 0)}</b></div>
-      <div class="note">${t.note || ""} · opened ${ago(t.ts_open)}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`).join("");
-  if (s.shadow && s.shadow.length) m.innerHTML += `<h2>Vetoed · shadow-tracked</h2>` + s.shadow.map(o => `<div class="card"><div class="row"><span>${o.pair} <small class="muted">@ ${px(o.entry)}</small></span><span class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl || 0)}</span></div></div>`).join("");
-  m.innerHTML += `<h2>Watchlist</h2><div class="card">` + Object.values(watch || {}).map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
-      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal setup " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("") + `</div>`;
-  if (s.history.length) m.innerHTML += `<h2>Recent</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`;
-  m.innerHTML += `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v5<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`;
+  if (s.manual && s.manual.length) put(L, `<h2>Your real trades</h2>` + s.manual.map(t => `<div class="card" style="border-color:var(--blue)"><div class="row"><b>${t.pair} <small class="muted">@ ${px(t.entry)} · ${fmt(t.usd, 0)} USD</small></b><b class="num ${(t.upnl || 0) >= 0 ? "up" : "dn"}">${sign(t.upnl || 0)}</b></div>
+      <div class="note">${t.note || ""} · opened ${ago(t.ts_open)}</div><button class="btn ghost" style="margin-top:8px;width:100%" onclick="closeForm('${t.id}','${t.pair}')">Close this trade</button></div>`).join(""));
+  if (s.shadow && s.shadow.length) put(L, `<h2>Vetoed · shadow-tracked</h2>` + s.shadow.map(o => `<div class="card"><div class="row"><span>${o.pair} <small class="muted">@ ${px(o.entry)}</small></span><span class="num ${o.upnl >= 0 ? "up" : "dn"}">${sign(o.upnl || 0)}</span></div></div>`).join(""));
+  const ws = Object.values(watch || {});
+  put(Rc, `<h2 style="margin-top:${wide ? 0 : 18}px">Watchlist · ${ws.filter(w => w.status !== "OFF").length} active</h2><div class="card" style="overflow:auto">` + (wide ? watchTable(ws) : ws.map(w => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)" onclick="view='watch';render()">
+      <span><b>${w.pair.replace("USD", "")}</b> <span class="muted num">${px(w.px)}</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "%" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span><span class="num ${w.dist_pct <= 1 ? "teal" : "muted"}">${w.status === "REV" ? "reversal " + w.reversal.conditions + "/4" : w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% to trigger" : "above trigger"}</span></div>`).join("")) + `</div>`);
+  put(Rc, `<h2>Alerts</h2><div class="card">${feed(s)}</div>`);
+  if (s.history.length) put(Rc, `<h2>Decisions</h2><div class="card">` + s.history.slice(0, 8).map(h => `<div class="note">${h}</div>`).join("") + `</div>`);
+  put(Rc, `<div class="muted" style="font-size:12px;text-align:center;margin-top:16px">${s.strategy} · ${s.pairs.join(" ")} · risk ${(s.risk * 100).toFixed(2)}% · ${s.mode === "cloud" ? "runs in the cloud every ~10 min" : "running on the PC"} · app v6<br><a style="color:var(--blue)" onclick="askTopic()">ntfy topic${topic ? " ✓" : " — set"}</a>${runUrl ? ` · <a style="color:var(--blue)" href="${runUrl}" target="_blank">run bot now</a>` : ""}</div>`);
 }
 
 function watchView(m) {
+  m.innerHTML += `<div class="charts" id="charts"></div>`; const C = $("#charts");
   for (const w of Object.values(watch || {})) {
     const open = (state.open || []).find(o => o.pair === w.pair);
-    m.innerHTML += `<div class="card"><div class="row"><span><b style="font-size:17px">${w.pair.replace("USD", "")}</b> <span class="muted">/ USD</span></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span></div>
+    C.insertAdjacentHTML("beforeend", `<div class="card"><div class="row"><span><b style="font-size:17px">${w.pair.replace("USD", "")}</b> <span class="muted">/ USD</span> <small class="num ${(w.chg24 || 0) >= 0 ? "up" : "dn"}">${w.chg24 != null ? sign(w.chg24) + "% 24h" : ""}</small></span><span class="badge ${w.status.toLowerCase()}">${w.status}</span></div>
       <div class="row"><span class="big num" style="font-size:26px">${px(w.px)}</span><span class="num ${w.dist_pct <= 1 && w.dist_pct >= 0 ? "teal" : "muted"}" style="text-align:right">${w.dist_pct >= 0 ? w.dist_pct.toFixed(2) + "% below trigger" : "above trigger"}<br><small class="muted">trigger ${px(w.trigger)}</small></span></div>
       <div class="chart" id="c_${w.pair}"></div>
       <div class="kv"><div>Daily trend<b class="${w.regime_up ? "up" : "dn"}">${w.regime_up ? "UP" : "DOWN · no trades"}</b></div><div>Volume (last bar)<b class="num">${fmt(w.vol_ratio, 1)}× avg</b></div><div>ATR<b class="num">${fmt(w.atr_pct, 1)}%</b></div>
-      <div>Reversal setup (1H)<b class="num ${w.reversal && w.reversal.conditions >= 3 ? "blue" : ""}">${w.reversal ? w.reversal.conditions + "/" + w.reversal.of + " · RSI " + w.reversal.rsi.toFixed(0) : "—"}</b></div><div>Risk per trade<b class="num">$${fmt(state.equity * state.risk, 0)}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`;
+      <div>Reversal setup (1H)<b class="num ${w.reversal && w.reversal.conditions >= 3 ? "blue" : ""}">${dots(w.reversal && w.reversal.flags)} ${w.reversal ? w.reversal.conditions + "/4 · RSI " + w.reversal.rsi.toFixed(0) + " · stoch " + w.reversal.stoch.toFixed(0) : "—"}</b></div><div>Daily EMA50<b class="num">${w.ema50_1d ? px(w.ema50_1d) : "—"}</b></div><div>${open ? "Open P&L" : "Position"}<b class="num ${open ? (open.upnl >= 0 ? "up" : "dn") : ""}">${open ? sign(open.upnl) : "none"}</b></div></div></div>`);
   }
   requestAnimationFrame(() => { for (const w of Object.values(watch || {})) drawChart(w); });
 }
