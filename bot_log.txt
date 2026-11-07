@@ -937,3 +937,5 @@
 2026-11-07 08:00:23 cloud step done in 1s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-07 08:10:21 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-07 08:10:21 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-07 08:20:20 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-07 08:20:20 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
