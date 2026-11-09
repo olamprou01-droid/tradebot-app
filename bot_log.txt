@@ -1,5 +1,3 @@
-✅ XRPUSD watch builds — OFF · trigger 1.2892 · rev 0/4
-✅ XRPUSD signal functions run — trend none · reversal none
 ✅ sizing: loss at stop = 1% of equity — $99.9 · order 3245 USD = 32.5%
 ✅ sizing: risk cut below -2.5%
 ✅ limits = Starter plan — kill 6% halt 5% target 10%
@@ -1498,3 +1496,5 @@
 2026-11-09 10:10:23 cloud step done in 1s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-09 10:20:22 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-09 10:20:22 cloud step done in 1s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-09 10:30:22 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-09 10:30:22 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
