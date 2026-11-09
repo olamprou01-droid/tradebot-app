@@ -1,5 +1,3 @@
-✅ SOLUSD indicators finite — atr14_4h=1.635, rsi14_1h=55.43, stoch_1h=90.29
-✅ SOLUSD indicator sanity
 ✅ SOLUSD watch builds — OFF · trigger 95.79 · rev 0/4
 ✅ SOLUSD signal functions run — trend none · reversal none
 ✅ LINKUSD 4H data fresh — last bar 1.0h ago
@@ -1498,3 +1496,5 @@
 2026-11-09 09:00:24 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-09 09:10:22 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-09 09:10:22 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-09 09:20:24 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-09 09:20:24 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
