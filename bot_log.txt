@@ -1,5 +1,3 @@
-✅ ETHUSD 4H data fresh — last bar 1.0h ago
-✅ ETHUSD bars — 4H 721 · 1H 721 · 1D 721
 ✅ ETHUSD indicators finite — atr14_4h=31.91, rsi14_1h=67.49, stoch_1h=89.99
 ✅ ETHUSD indicator sanity
 ✅ ETHUSD watch builds — OFF · trigger 2,314.3 · rev 0/4
@@ -1498,3 +1496,5 @@
 2026-11-09 08:20:23 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-09 08:30:28 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-09 08:30:28 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-09 08:40:20 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-09 08:40:20 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
