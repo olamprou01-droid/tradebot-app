@@ -1,5 +1,3 @@
-✅ LINKUSD 4H data fresh — last bar 2.8h ago
-✅ LINKUSD bars — 4H 721 · 1H 721 · 1D 721
 ✅ LINKUSD indicators finite — atr14_4h=0.3044, rsi14_1h=42.2, stoch_1h=48.26
 ✅ LINKUSD indicator sanity
 ✅ LINKUSD watch builds — OFF · trigger 11.81 · rev 0/4
@@ -1498,3 +1496,5 @@
 2026-11-11 19:00:27 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-11 19:10:22 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-11 19:10:22 cloud step done in 3s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-11 19:20:33 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-11 19:20:33 cloud step done in 9s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
