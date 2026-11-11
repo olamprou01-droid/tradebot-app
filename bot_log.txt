@@ -1,5 +1,3 @@
-✅ limits = Starter plan — kill 6% halt 5% target 10%
-✅ max open / per coin
 ✅ backtest engine runs on live data — 8 S4 trades in the last 120 days of ETHUSD
 2026-11-06 10:50:29 test alerts sent
 2026-11-06 10:50:31 ctl poll since 09:01Z: http 200, 0 message(s)
@@ -1498,3 +1496,5 @@
 2026-11-11 20:10:36 cloud step done in 1s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-11 22:12:54 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-11 22:12:54 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-11 22:20:26 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-11 22:20:26 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
