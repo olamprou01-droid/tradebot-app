@@ -1,5 +1,3 @@
-✅ XRPUSD 4H data fresh — last bar 2.8h ago
-✅ XRPUSD bars — 4H 721 · 1H 721 · 1D 721
 ✅ XRPUSD indicators finite — atr14_4h=0.02632, rsi14_1h=32.12, stoch_1h=45.83
 ✅ XRPUSD indicator sanity
 ✅ XRPUSD watch builds — OFF · trigger 1.3400 · rev 0/4
@@ -1498,3 +1496,5 @@
 2026-11-11 19:30:26 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
 2026-11-11 19:40:23 ctl poll since 09:01Z: http 200, 0 message(s)
 2026-11-11 19:40:23 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
+2026-11-11 19:50:26 ctl poll since 09:01Z: http 200, 0 message(s)
+2026-11-11 19:50:26 cloud step done in 2s · equity 10000.00 · open 0 · pending False · ETH:OFF SOL:OFF LINK:OFF XRP:OFF
