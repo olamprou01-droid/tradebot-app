@@ -66,6 +66,16 @@ def log(msg):
     with open(LOG_F, "a", encoding="utf-8") as f: f.write(line + "\n")
 
 
+STRAT_NAME = {"S4": "TREND", "S002": "REVERSAL", "manual": "REAL TRADE"}
+def head(strat, pair, entry=None, event="", label="entry"):
+    """Alert title, always in this order: strategy · symbol · entry price · what happened."""
+    parts = [STRAT_NAME.get(strat, strat or "TREND"), pair]
+    if entry is not None: parts.append(f"{label} {P(entry)}")
+    if event: parts.append(event)
+    return " · ".join(parts)
+def stag(strat, event): return f"{STRAT_NAME.get(strat, 'TREND').lower().replace(' ', '-')},{event}"   # plain-text tags (no emoji prefix, so the strategy stays first)
+
+
 PRIO = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}
 _alerts = []
 def notify(title, msg, actions=None, priority="default", tags=""):
@@ -171,9 +181,9 @@ def risk_check(st):
     if st["week"] != week: st["week"], st["week_pnl"] = week, 0.0
     dd = 1 - st["equity"] / START_EQUITY
     if dd >= LIMITS["kill"] and not st["killed"]:
-        st["killed"] = True; notify("KILL LINE HIT", f"Equity {st['equity']:.0f} is -{dd*100:.1f}% from start. The real account would be closed. Bot stopped.", priority="urgent", tags="skull")
+        st["killed"] = True; notify("SYSTEM · 💀 KILL LINE HIT", f"Equity {st['equity']:.0f} is -{dd*100:.1f}% from start. The real account would be closed. Bot stopped.", priority="urgent", tags="system,kill")
     if dd >= LIMITS["halt"] and not st["halted"] and not st["killed"]:
-        st["halted"] = True; notify(f"HALT: {LIMITS['halt']*100:.0f}% drawdown", f"1% left before the {LIMITS['kill']*100:.0f}% kill line. No new entries until you clear it in the app.", priority="high", tags="warning")
+        st["halted"] = True; notify(f"SYSTEM · ⛔ HALT at {LIMITS['halt']*100:.0f}% drawdown", f"1% left before the {LIMITS['kill']*100:.0f}% kill line. No new entries until you clear it in the app.", priority="high", tags="system,halt")
     reasons = []
     if st["killed"]: reasons.append("kill line")
     if st["halted"]: reasons.append("halted")
@@ -206,13 +216,13 @@ def make_proposal(st, sig):
 
 
 def push_proposal(p):
-    kind = "REVERSAL · 1H washout, exit +1-5% or sell signal" if p.get("strat") == "S002" else "TREND · 4H breakout, trailing exit, no fixed TP"
-    body = (f"BUY {p['pair']} @ {P(p['entry'])}\nORDER SIZE: {p['notional']:.0f} USD = {p['pct_of_account']:.1f}% of account ({p['size']} {p['pair'][:-3]})\n"
+    kind = "1H washout, exit +1-5% or sell signal" if p.get("strat") == "S002" else "4H breakout, trailing exit, no fixed TP"
+    body = (f"{STRAT_NAME.get(p.get('strat'), 'TREND')} strategy · BUY {p['pair']} @ {P(p['entry'])}\nORDER SIZE: {p['notional']:.0f} USD = {p['pct_of_account']:.1f}% of account ({p['size']} {p['pair'][:-3]})\n"
             f"STOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · {kind}\nmax loss ${p['max_loss']:.0f}\n"
             f"volume {p['vol_ratio']:.1f}× avg · ATR {p['atr_pct']:.1f}%\nNo answer in {PROPOSAL_TIMEOUT_MIN} min = accept (paper)")
     actions = [{"action": "http", "label": "ACCEPT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"accept:{p['id']}", "clear": True},
                {"action": "http", "label": "REJECT", "url": f"{NTFY}/{NTFY_CTL}", "method": "POST", "body": f"reject:{p['id']}", "clear": True}]
-    notify(f"{'🔄' if p.get('strat') == 'S002' else '📈'} PROPOSAL · BUY {p['pair']} @ {P(p['entry'])}", body, actions=actions, priority="high", tags="chart_with_upwards_trend")
+    notify(head(p.get("strat"), p["pair"], p["entry"], f"{'🔄' if p.get('strat') == 'S002' else '📈'} BUY PROPOSAL"), body, actions=actions, priority="high", tags=stag(p.get("strat"), "proposal"))
 
 
 def poll_control(st):
@@ -228,12 +238,12 @@ def poll_control(st):
             msg = m.get("message", "").strip(); low = msg.lower()
             log(f"phone -> bot: {msg[:80]}")
             if low in ("accept:testonly", "reject:testonly"):
-                notify("✅ Your tap reached the bot", f"Received '{msg}' from your phone at {iso(int(m.get('time', time.time())))[11:16]} UTC. The ACCEPT/REJECT buttons work.", tags="white_check_mark"); continue
+                notify("SYSTEM · ✅ your tap reached the bot", f"Received '{msg}' from your phone at {iso(int(m.get('time', time.time())))[11:16]} UTC. The ACCEPT/REJECT buttons work.", tags="system,test"); continue
             p = st.get("pending")
             if (low.startswith("accept:") or low.startswith("reject:")) and p and low.split(":", 1)[1] == p["id"]:
                 decide(st, low.split(":")[0], "phone")
             elif low == "clearhalt":
-                st["halted"] = False; log("halt cleared from phone"); notify("Halt cleared", "New entries allowed again.", tags="white_check_mark")
+                st["halted"] = False; log("halt cleared from phone"); notify("SYSTEM · ✅ halt cleared", "New entries allowed again.", tags="system")
             elif low.startswith("note:"):
                 _, tid, text = msg.split(":", 2)
                 journal_add(dict(ts=iso(time.time()), trade_id=tid.strip(), note=text.strip(), by="owner")); log(f"journal note on {tid}: {text[:60]}")
@@ -242,7 +252,7 @@ def poll_control(st):
                 m = dict(id="m" + uuid.uuid4().hex[:6], pair=pair.strip().upper(), entry=float(price), usd=float(usd or 0), note=note.strip(), ts_open=time.time(), by="owner")
                 st["manual"].append(m); log(f"MANUAL OPEN {m}")
                 journal_add(dict(ts=iso(time.time()), trade_id=m["id"], note=f"Real trade opened: {m['pair']} @ {P(m['entry'])}, {m['usd']:.0f} USD. {m['note']}", by="owner"))
-                notify(f"📝 Logged real trade {m['pair']} @ {P(m['entry'])}", f"{m['usd']:.0f} USD · shown on every screen. Close it from the app when you exit.", tags="memo")
+                notify(head("manual", m["pair"], m["entry"], "📝 LOGGED"), f"{m['usd']:.0f} USD · shown on every screen. Close it from the app when you exit.", tags=stag("manual", "logged"))
             elif low.startswith("mclose:"):          # mclose:id:price:note
                 _, mid, price, note = (msg.split(":", 3) + [""])[:4]
                 for m in list(st["manual"]):
@@ -258,7 +268,7 @@ def decide(st, decision, who):
     pos = dict(p, trade_id=p["id"], ts_open=time.time(), hi=p["entry"], bars=0, peak_R=0.0, decision=f"{decision}:{who}")
     if decision == "accept" and len(st["open"]) < MAX_OPEN and p["pair"] not in [o["pair"] for o in st["open"]]:
         st["open"].append(pos); log(f"OPEN {p['pair']} {p['size']} @ {P(p['entry'])} stop {P(p['stop'])} ({who})")
-        notify(f"🟢 OPENED {p['pair']} @ {P(p['entry'])}", f"{p.get('notional', 0):.0f} USD ({p.get('pct_of_account', 0):.1f}% of account) · now place a STOP LOSS order at {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%)\nI will tell you when price gets near it and when to move it up.", tags="white_check_mark")
+        notify(head(p.get("strat"), p["pair"], p["entry"], "🟢 OPENED"), f"{p.get('notional', 0):.0f} USD ({p.get('pct_of_account', 0):.1f}% of account) · now place a STOP LOSS order at {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%)\nI will tell you when price gets near it and when to move it up.", tags=stag(p.get("strat"), "opened"))
         journal_add(dict(ts=iso(time.time()), trade_id=p["id"], note=f"Opened {p['pair']} @ {P(p['entry'])} ({who}). Volume {p['vol_ratio']:.1f}× avg, ATR {p['atr_pct']:.1f}%.", by="bot"))
     else:
         pos["shadow"] = True; st["shadow"].append(pos)
@@ -305,17 +315,17 @@ def position_alerts(pos, bid):
     pair, r = pos["pair"], pos["r"]
     if pos["stop_dist_pct"] <= NEAR_STOP_PCT * 100 and not pos.get("near_alerted"):
         pos["near_alerted"] = True
-        notify(f"🟡 {pair} NEAR STOP · {P(bid)} is {pos['stop_dist_pct']:.2f}% above {P(pos['stop'])}",
-               f"Close at market if it trades through {P(pos['stop'])}. Current {pos['R_now']:+.1f}R ({pos['upnl']:+.0f} USD).", priority="high", tags="warning")
+        notify(head(pos.get("strat"), pair, pos["entry"], f"🟡 NEAR STOP {P(pos['stop'])}"),
+               f"Price {P(bid)} is {pos['stop_dist_pct']:.2f}% above the stop {P(pos['stop'])}. Close at market if it trades through it. Current {pos['R_now']:+.1f}R ({pos['upnl']:+.0f} USD).", priority="high", tags=stag(pos.get("strat"), "near-stop"))
     elif pos["stop_dist_pct"] > NEAR_STOP_PCT * 200: pos["near_alerted"] = False
     if pos["stop"] > pos.get("stop_alerted", pos["stop"]) + 0.25 * r:
         locked = (pos["stop"] - pos["entry"]) / r
-        notify(f"🔵 {pair} STOP MOVED UP → {P(pos['stop'])}", f"Edit your stop-loss order to {P(pos['stop'])} ({locked:+.1f}R {'locked in' if locked > 0 else 'from entry'}). Price {P(bid)}.", tags="arrow_up")
+        notify(head(pos.get("strat"), pair, pos["entry"], f"🔵 MOVE STOP → {P(pos['stop'])}"), f"Edit your stop-loss order to {P(pos['stop'])} ({locked:+.1f}R {'locked in' if locked > 0 else 'from entry'}). Price {P(bid)}.", tags=stag(pos.get("strat"), "stop-moved"))
     pos.setdefault("stop_alerted", pos["stop"]); pos["stop_alerted"] = max(pos["stop_alerted"], pos["stop"])
     done = set(pos.get("milestones", []))
     for m in MILESTONES:
         if pos["R_now"] >= m and m not in done:
-            done.add(m); notify(f"🏁 {pair} +{m}R reached @ {P(bid)}", f"+{pos['upnl']:.0f} USD. " + ("Reversal trade: it exits at +1% after the first closed hour, +5% any time, or on its sell signal — I will tell you." if pos.get("strat") == "S002" else f"No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so."), tags="checkered_flag")
+            done.add(m); notify(head(pos.get("strat"), pair, pos["entry"], f"🏁 +{m}R @ {P(bid)}"), f"+{pos['upnl']:.0f} USD. " + ("Reversal trade: it exits at +1% after the first closed hour, +5% any time, or on its sell signal — I will tell you." if pos.get("strat") == "S002" else f"No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so."), tags=stag(pos.get("strat"), "checkpoint"))
     pos["milestones"] = sorted(done)
 
 
@@ -336,7 +346,7 @@ def close_position(st, pos, px, reason, shadow=False):
     tag = "SHADOW " if shadow else ""
     log(f"{tag}CLOSE {pos['pair']} {reason} @ {P(px)} net {net:+.2f}" + ("" if shadow else f" equity {st['equity']:.2f}"))
     if not shadow:
-        notify(f"🔴 CLOSE {pos['pair']} NOW @ {P(px)} · {reason.upper()}", f"{'stop hit' if reason.startswith('stop') else reason} · exit at market now\nnet {net:+.0f} USD ({R:+.1f}R) · equity {st['equity']:.0f}", priority="high", tags="moneybag" if net > 0 else "small_red_triangle_down")
+        notify(head(pos.get("strat"), pos["pair"], pos["entry"], f"🔴 CLOSE NOW @ {P(px)} ({reason.upper()})"), f"{'stop hit' if reason.startswith('stop') else reason} · exit at market now\nentry {P(pos['entry'])} → exit {P(px)}\nnet {net:+.0f} USD ({R:+.1f}R) · equity {st['equity']:.0f}", priority="high", tags=stag(pos.get("strat"), "close"))
     lesson = auto_lesson(pos, reason, R)
     journal_add(dict(ts=iso(time.time()), trade_id=pos["trade_id"], note=f"{tag}Closed {pos['pair']} {reason} {R:+.1f}R. {lesson}", by="bot"))
     st["history"].insert(0, f"{now():%m-%d %H:%M} {tag}CLOSE {pos['pair']} {reason} {R:+.1f}R"); st["history"] = st["history"][:30]
@@ -353,7 +363,7 @@ def close_manual(st, m, px, note):
                       return_pct=round(net / START_EQUITY * 100, 3), signal="manual", exit_reason="manual_" + ("profit" if net > 0 else "loss"),
                       decision="manual", bars_held=round(bars, 1), R=""))
     journal_add(dict(ts=iso(time.time()), trade_id=m["id"], note=f"Real trade closed: {m['pair']} {P(m['entry'])} → {P(px)}, net {net:+.0f} USD ({(px/m['entry']-1)*100:+.2f}%). {note}", by="owner"))
-    notify(f"📝 Real trade closed {m['pair']} {net:+.0f} USD", f"{P(m['entry'])} → {P(px)} ({(px/m['entry']-1)*100:+.2f}%) after fees+swap. {note}", tags="memo")
+    notify(head("manual", m["pair"], m["entry"], f"📝 CLOSED @ {P(px)} · {net:+.0f} USD"), f"{P(m['entry'])} → {P(px)} ({(px/m['entry']-1)*100:+.2f}%) after fees+swap. {note}", tags=stag("manual", "closed"))
     st["history"].insert(0, f"{now():%m-%d %H:%M} REAL CLOSE {m['pair']} {net:+.0f} USD"); st["history"] = st["history"][:30]
     log(f"MANUAL CLOSE {m['id']} {m['pair']} @ {px} net {net:+.2f}")
 
@@ -502,7 +512,7 @@ def main():
     log(f"bot v2 started · {STRATEGY} · {PAIRS} · risk {RISK*100:.2f}% · desktop http://127.0.0.1:{PORT} · app http://127.0.0.1:{PORT}/app · github {'on' if GH_REPO and GH_TOKEN else 'off'}")
     try: gh_ensure_branch()
     except Exception as e: log(f"github branch check failed: {e}")
-    notify("TradeBot v2 running", f"{STRATEGY} on {','.join(PAIRS)} · paper · risk {RISK*100:.2f}%", tags="robot")
+    notify("SYSTEM · 🤖 TradeBot running", f"{STRATEGY} on {','.join(PAIRS)} · paper · risk {RISK*100:.2f}%", tags="system")
     first = True
     while True:
         with LOCK: step(STATE, first)
@@ -530,7 +540,7 @@ def step(st, first=False):
                 else: log(f"{sig['strat']} signal on {pair} ignored (blocked={st.get('blocked')}, pending={bool(st['pending'])}, open={len(st['open'])})")
             w = st["watch"][pair]
             if w["status"] == "ARMED" and not st.get(f"armed_{pair}"):
-                notify(f"👀 {pair} ARMED · {P(w['px'])} is {w['dist_pct']:.2f}% below trigger {P(w['trigger'])}", f"Daily trend UP · breakout level {P(w['trigger'])} · vol {w['vol_ratio']:.1f}× avg · stop would be {P(w['stop_if_entered'])}", tags="eyes")
+                notify(head("S4", pair, w["trigger"], f"👀 ARMED · {w['dist_pct']:.2f}% away", label="trigger"), f"Price {P(w['px'])} · daily trend UP · breakout level {P(w['trigger'])} · vol {w['vol_ratio']:.1f}× avg · stop would be {P(w['stop_if_entered'])}", tags=stag("S4", "armed"))
             st[f"armed_{pair}"] = w["status"] == "ARMED"
         poll_control(st)
         if st["pending"] and time.time() > st["pending"]["expires"]: decide(st, "accept", "timeout")
