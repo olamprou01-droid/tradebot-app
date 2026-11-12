@@ -5,14 +5,14 @@
  "shadow": [],
  "pending": null,
  "last_bar": {
-  "ETHUSD": 1794456000,
-  "SOLUSD": 1794456000,
-  "LINKUSD": 1794456000,
-  "XRPUSD": 1794456000,
-  "ETHUSD_60": 1794466800,
-  "SOLUSD_60": 1794466800,
-  "LINKUSD_60": 1794466800,
-  "XRPUSD_60": 1794466800
+  "ETHUSD": 1794470400,
+  "SOLUSD": 1794470400,
+  "LINKUSD": 1794470400,
+  "XRPUSD": 1794470400,
+  "ETHUSD_60": 1794470400,
+  "SOLUSD_60": 1794470400,
+  "LINKUSD_60": 1794470400,
+  "XRPUSD_60": 1794470400
  },
  "halted": false,
  "killed": false,
@@ -24,18 +24,18 @@
  "watch": {
   "ETHUSD": {
    "pair": "ETHUSD",
-   "px": 2047.44,
+   "px": 2048.85,
    "regime_up": false,
-   "trigger": 2229.53,
-   "dist_pct": 8.89354510999102,
-   "atr_pct": 1.7499460028695752,
-   "vol_ratio": 0.2966288825114566,
+   "trigger": 2157.51,
+   "dist_pct": 5.303462918222433,
+   "atr_pct": 1.6818780839948089,
+   "vol_ratio": 0.44196666141384566,
    "status": "OFF",
-   "stop_if_entered": 1975.7818111176944,
+   "stop_if_entered": 1979.9316817521446,
    "reversal": {
-    "rsi": 39.63852581710196,
-    "stoch": 20.51698486153791,
-    "bb_lower": 2033.992300435052,
+    "rsi": 44.0120177809914,
+    "stoch": 33.77402011789322,
+    "bb_lower": 2032.8789229163601,
     "hammer": false,
     "conditions": 0,
     "of": 4,
@@ -46,10 +46,9 @@
      false
     ]
    },
-   "chg24": -0.534743732102172,
+   "chg24": -0.8698891592845426,
    "ema50_1d": 2344.624997855707,
    "spark": [
-    2414.26,
     2418.3,
     2418.09,
     2416.01,
@@ -216,17 +215,10 @@
     2052.41,
     2047.86,
     2044.0,
-    2042.34
+    2042.34,
+    2048.95
    ],
    "candles": [
-    [
-     1792310400,
-     2405.68,
-     2425.98,
-     2403.95,
-     2414.6,
-     1575.54
-    ],
     [
      1792324800,
      2414.95,
@@ -1416,15 +1408,19 @@
      2052.41,
      2054.0,
      2037.35,
-     2047.44,
-     2148.63
+     2048.95,
+     2203.82
+    ],
+    [
+     1794470400,
+     2048.85,
+     2048.85,
+     2048.44,
+     2048.85,
+     0.32
     ]
    ],
    "donchian": [
-    [
-     1792310400,
-     2490.84
-    ],
     [
      1792324800,
      2490.84
@@ -2020,37 +2016,40 @@
     [
      1794456000,
      2229.53
+    ],
+    [
+     1794470400,
+     2157.51
     ]
    ]
   },
   "SOLUSD": {
    "pair": "SOLUSD",
-   "px": 82.87,
+   "px": 82.91,
    "regime_up": false,
-   "trigger": 89.5,
-   "dist_pct": 8.000482683721485,
-   "atr_pct": 1.981997858046759,
-   "vol_ratio": 0.2632069517686187,
+   "trigger": 88.37,
+   "dist_pct": 6.585454106862873,
+   "atr_pct": 1.920521488405977,
+   "vol_ratio": 0.2877549225858656,
    "status": "OFF",
-   "stop_if_entered": 79.5850367500733,
+   "stop_if_entered": 79.7253912679252,
    "reversal": {
-    "rsi": 38.45464203640234,
-    "stoch": 19.731615404541103,
-    "bb_lower": 82.35450022095397,
+    "rsi": 42.1048512724629,
+    "stoch": 27.98250151950485,
+    "bb_lower": 82.23022306801685,
     "hammer": false,
-    "conditions": 1,
+    "conditions": 0,
     "of": 4,
     "flags": [
      false,
-     true,
+     false,
      false,
      false
     ]
    },
-   "chg24": 0.15755665979879652,
+   "chg24": -0.4203194427765067,
    "ema50_1d": 98.9100355018448,
    "spark": [
-    95.77,
     96.7,
     96.79,
     96.51,
@@ -2217,17 +2216,10 @@
     83.27,
     83.01,
     82.79,
-    82.64
+    82.64,
+    82.92
    ],
    "candles": [
-    [
-     1792310400,
-     103.18,
-     104.2,
-     102.86,
-     103.86,
-     11306.73
-    ],
     [
      1792324800,
      103.87,
@@ -3417,15 +3409,19 @@
      83.27,
      83.35,
      82.41,
-     82.87,
-     10655.91
+     82.92,
+     10879.32
+    ],
+    [
+     1794470400,
+     82.91,
+     82.91,
+     82.9,
+     82.91,
+     6.6
     ]
    ],
    "donchian": [
-    [
-     1792310400,
-     107.31
-    ],
     [
      1792324800,
      107.31
@@ -4021,37 +4017,40 @@
     [
      1794456000,
      89.5
+    ],
+    [
+     1794470400,
+     88.37
     ]
    ]
   },
   "LINKUSD": {
    "pair": "LINKUSD",
-   "px": 10.08443,
+   "px": 10.09671,
    "regime_up": false,
    "trigger": 10.82151,
-   "dist_pct": 7.309089358545805,
-   "atr_pct": 2.2695499292842003,
-   "vol_ratio": 0.4531653169052405,
+   "dist_pct": 7.178575991585379,
+   "atr_pct": 2.1837490070232857,
+   "vol_ratio": 0.8577909432898616,
    "status": "OFF",
-   "stop_if_entered": 9.62668765213257,
+   "stop_if_entered": 9.655736391265958,
    "reversal": {
-    "rsi": 31.54144062419938,
-    "stoch": 10.364386546797238,
-    "bb_lower": 9.976070233544899,
+    "rsi": 37.921226951108,
+    "stoch": 23.63568016967184,
+    "bb_lower": 9.951857249142597,
     "hammer": false,
-    "conditions": 1,
+    "conditions": 0,
     "of": 4,
     "flags": [
      false,
-     true,
+     false,
      false,
      false
     ]
    },
-   "chg24": -2.231075697211149,
+   "chg24": -2.3505624757053423,
    "ema50_1d": 11.629950611811324,
    "spark": [
-    11.51163,
     11.6,
     11.58943,
     11.53575,
@@ -4218,17 +4217,10 @@
     10.1,
     10.10221,
     10.02411,
-    10.03686
+    10.03686,
+    10.09869
    ],
    "candles": [
-    [
-     1792310400,
-     11.96866,
-     12.05457,
-     11.9194,
-     12.007,
-     22583.7
-    ],
     [
      1792324800,
      12.01057,
@@ -5418,15 +5410,19 @@
      10.10381,
      10.12149,
      10.01,
-     10.08443,
-     38604.2
+     10.09869,
+     39066.1
+    ],
+    [
+     1794470400,
+     10.09705,
+     10.09709,
+     10.09671,
+     10.09671,
+     4.58
     ]
    ],
    "donchian": [
-    [
-     1792310400,
-     12.76093
-    ],
     [
      1792324800,
      12.76093
@@ -6022,37 +6018,40 @@
     [
      1794456000,
      10.82151
+    ],
+    [
+     1794470400,
+     10.82151
     ]
    ]
   },
   "XRPUSD": {
    "pair": "XRPUSD",
-   "px": 1.04287,
+   "px": 1.0426,
    "regime_up": false,
-   "trigger": 1.15299,
-   "dist_pct": 10.55932187137419,
-   "atr_pct": 2.2345648015271857,
-   "vol_ratio": 0.4237486707346369,
+   "trigger": 1.12503,
+   "dist_pct": 7.9061960483406875,
+   "atr_pct": 2.1601687902080338,
+   "vol_ratio": 0.6142275016284539,
    "status": "OFF",
-   "stop_if_entered": 0.9962627881086268,
+   "stop_if_entered": 0.997556160386582,
    "reversal": {
-    "rsi": 36.3077458521535,
-    "stoch": 15.898169919936024,
-    "bb_lower": 1.0376975998135323,
+    "rsi": 38.81839235016714,
+    "stoch": 27.559251783319194,
+    "bb_lower": 1.0361048539682323,
     "hammer": false,
-    "conditions": 1,
+    "conditions": 0,
     "of": 4,
     "flags": [
      false,
-     true,
+     false,
      false,
      false
     ]
    },
-   "chg24": -1.3716029839711097,
+   "chg24": -1.4237634245953812,
    "ema50_1d": 1.2821209998208025,
    "spark": [
-    1.31244,
     1.32241,
     1.31899,
     1.31711,
@@ -6219,17 +6218,10 @@
     1.04665,
     1.04327,
     1.03952,
-    1.0405
+    1.0405,
+    1.0427
    ],
    "candles": [
-    [
-     1792310400,
-     1.29131,
-     1.30236,
-     1.28684,
-     1.29655,
-     798994.66
-    ],
     [
      1792324800,
      1.29674,
@@ -7419,15 +7411,19 @@
      1.04712,
      1.04851,
      1.03615,
-     1.04287,
-     2798966.98
+     1.0427,
+     2890458.54
+    ],
+    [
+     1794470400,
+     1.0427,
+     1.0427,
+     1.04255,
+     1.0426,
+     200.19
     ]
    ],
    "donchian": [
-    [
-     1792310400,
-     1.35208
-    ],
     [
      1792324800,
      1.35208
@@ -8023,6 +8019,10 @@
     [
      1794456000,
      1.15299
+    ],
+    [
+     1794470400,
+     1.12503
     ]
    ]
   }
@@ -8060,6 +8060,48 @@
    "ts": 1793962228.922154,
    "title": "\ud83e\uddea TEST \u00b7 \ud83d\udd34 CLOSE ETHUSD NOW @ 2,206.4 \u00b7 STOP",
    "msg": "TEST ONLY. stop hit \u00b7 exit at market now",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470423.503691,
+   "title": "SYSTEM \u00b7 \u2705 SELF-TEST PASSED: 30/30 checks",
+   "msg": "\u2705 Kraken reachable, clock drift \u2014 0s\n\u2705 ETHUSD 4H data fresh \u2014 last bar 0.0h ago\n\u2705 ETHUSD bars \u2014 4H 721 \u00b7 1H 721 \u00b7 1D 721\n\u2705 ETHUSD indicators finite \u2014 atr14_4h=3",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470423.7615302,
+   "title": "TREND \u00b7 ETHUSD \u00b7 entry 2,274.7 \u00b7 \ud83d\udcc8 BUY PROPOSAL",
+   "msg": "TEST ONLY \u2014 not a real signal.\nTREND strategy \u00b7 BUY ETHUSD @ 2,274.7\nORDER SIZE: 3245 USD = 32.5% of account (1.4267 ETH)\nSTOP 2,206.4 (-3.0%) \u00b7 4H breakout, tr",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470423.993297,
+   "title": "REVERSAL \u00b7 SOLUSD \u00b7 entry 90.12 \u00b7 \ud83d\udd04 BUY PROPOSAL",
+   "msg": "TEST ONLY \u2014 not a real signal.\nREVERSAL strategy \u00b7 BUY SOLUSD @ 90.12\nORDER SIZE: 3330 USD = 33.3% of account (36.95 SOL)\nSTOP 87.42 (-3.0%) \u00b7 1H washout, exit ",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470424.217124,
+   "title": "TREND \u00b7 ETHUSD \u00b7 entry 2,274.7 \u00b7 \ud83d\udfe2 OPENED",
+   "msg": "TEST ONLY \u2014 not a real signal.\n3245 USD (32.5% of account) \u00b7 now place a STOP LOSS order at 2,206.4 (-3.0%)",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470424.4419136,
+   "title": "TREND \u00b7 ETHUSD \u00b7 entry 2,274.7 \u00b7 \ud83d\udd35 MOVE STOP \u2192 2,310.0",
+   "msg": "TEST ONLY \u2014 not a real signal.\nEdit your stop-loss order to 2,310.0 (+0.5R locked in). Price 2,415.0.",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470424.6657193,
+   "title": "TREND \u00b7 ETHUSD \u00b7 entry 2,274.7 \u00b7 \ud83d\udfe1 NEAR STOP 2,310.0",
+   "msg": "TEST ONLY \u2014 not a real signal.\nPrice 2,322.0 is 0.52% above the stop 2,310.0. Close at market if it trades through it.",
+   "priority": "default"
+  },
+  {
+   "ts": 1794470424.8964844,
+   "title": "REVERSAL \u00b7 SOLUSD \u00b7 entry 90.12 \u00b7 \ud83d\udd34 CLOSE NOW @ 91.05 (ROI)",
+   "msg": "TEST ONLY \u2014 not a real signal.\nroi \u00b7 exit at market now\nentry 90.12 \u2192 exit 91.05\nnet +31 USD (+0.3R)",
    "priority": "default"
   }
  ]
