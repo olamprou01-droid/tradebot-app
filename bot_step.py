@@ -17,7 +17,7 @@ review.LEDGER, review.OUT_MD, review.OUT_JSON = d / "ledger.csv", d / "strategy_
 
 st = bot.load_state()
 if not st.get("announced_cloud"):
-    bot.notify("☁️ TradeBot now runs in the cloud", f"{bot.STRATEGY} on {','.join(bot.PAIRS)} · paper · risk {bot.RISK*100:.2f}% · every ~10 min, no PC needed.", tags="robot")
+    bot.notify("SYSTEM · ☁️ TradeBot now runs in the cloud", f"{bot.STRATEGY} on {','.join(bot.PAIRS)} · paper · risk {bot.RISK*100:.2f}% · every ~10 min, no PC needed.", tags="system")
     st["announced_cloud"] = True
 flag = d / "RUN_TEST"
 if os.getenv("TEST_ALERT") or flag.exists():
@@ -25,13 +25,17 @@ if os.getenv("TEST_ALERT") or flag.exists():
     import selftest
     head, body, fails = selftest.report(selftest.run())
     bot.log(head); bot.log(body)
-    bot.notify(("✅ " if not fails else "❌ ") + head, body[:3800], priority="high" if fails else "default", tags="test_tube")
+    bot.notify("SYSTEM · " + ("✅ " if not fails else "❌ ") + head, body[:3800], priority="high" if fails else "default", tags="system,test")
     # one sample of every alert type, clearly marked TEST, so the phone channel is proven end to end
-    bot.notify("🧪 TEST · 📈 PROPOSAL · BUY ETHUSD @ 2,274.7", "TEST ONLY — not a real signal.\nORDER SIZE: 3245 USD = 32.5% of account (1.4267 ETH)\nSTOP 2,206.4 (-3.0%) · TREND · trailing exit\nmax loss $100",
-               actions=[{"action": "http", "label": "ACCEPT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "accept:testonly", "clear": True},
-                        {"action": "http", "label": "REJECT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "reject:testonly", "clear": True}], tags="chart_with_upwards_trend")
-    bot.notify("🧪 TEST · 🟡 ETHUSD NEAR STOP · 2,215.0 is 0.39% above 2,206.4", "TEST ONLY. Close at market if it trades through 2,206.4.", tags="warning")
-    bot.notify("🧪 TEST · 🔴 CLOSE ETHUSD NOW @ 2,206.4 · STOP", "TEST ONLY. stop hit · exit at market now", tags="small_red_triangle_down")
+    acts = [{"action": "http", "label": "ACCEPT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "accept:testonly", "clear": True},
+            {"action": "http", "label": "REJECT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "reject:testonly", "clear": True}]
+    T = "TEST ONLY — not a real signal.\n"
+    bot.notify(bot.head("S4", "ETHUSD", 2274.7, "📈 BUY PROPOSAL"), T + "TREND strategy · BUY ETHUSD @ 2,274.7\nORDER SIZE: 3245 USD = 32.5% of account (1.4267 ETH)\nSTOP 2,206.4 (-3.0%) · 4H breakout, trailing exit, no fixed TP\nmax loss $100", actions=acts, tags="trend,proposal,test")
+    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔄 BUY PROPOSAL"), T + "REVERSAL strategy · BUY SOLUSD @ 90.12\nORDER SIZE: 3330 USD = 33.3% of account (36.95 SOL)\nSTOP 87.42 (-3.0%) · 1H washout, exit +1-5% or sell signal\nmax loss $100", actions=acts, tags="reversal,proposal,test")
+    bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🟢 OPENED"), T + "3245 USD (32.5% of account) · now place a STOP LOSS order at 2,206.4 (-3.0%)", tags="trend,opened,test")
+    bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🔵 MOVE STOP → 2,310.0"), T + "Edit your stop-loss order to 2,310.0 (+0.5R locked in). Price 2,415.0.", tags="trend,stop-moved,test")
+    bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🟡 NEAR STOP 2,310.0"), T + "Price 2,322.0 is 0.52% above the stop 2,310.0. Close at market if it trades through it.", tags="trend,near-stop,test")
+    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔴 CLOSE NOW @ 91.05 (ROI)"), T + "roi · exit at market now\nentry 90.12 → exit 91.05\nnet +31 USD (+0.3R)", tags="reversal,close,test")
     bot.log("test alerts sent")
 t0 = time.time()
 bot.step(st, first=True)                             # force=True publishes every run (the workflow commits only if something changed)
