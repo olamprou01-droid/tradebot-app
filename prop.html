@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#07090b">
+<title>PropBot</title>
+<style>
+:root{--bg:#07090b;--panel:#0e1215;--line:#1e262c;--text:#d7dee3;--dim:#6f7d87;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--teal:#14b8a6}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{padding:calc(env(safe-area-inset-top) + 12px) 16px 40px;max-width:960px;margin:0 auto}
+header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-size:15px;margin:0 6px 0 0;letter-spacing:.08em}
+.chip{border:1px solid var(--line);color:var(--dim);background:none;padding:4px 10px;border-radius:3px;font:inherit;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.chip.on{border-color:var(--teal);color:var(--teal)}.chip.g{border-color:var(--green);color:var(--green)}.chip.r{border-color:var(--red);color:var(--red)}.chip.a{border-color:var(--amber);color:var(--amber)}
+.sp{flex:1} nav{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;margin-bottom:10px}
+.lbl{color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.big{font-size:22px;font-weight:600}.act{font-size:15px;font-weight:600}
+.g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.t{color:var(--teal)}.d{color:var(--dim)}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:620px){.grid3{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+.bar{position:relative;height:8px;background:#151b20;border-radius:2px;margin:6px 0 2px;overflow:hidden}.bar i{position:absolute;top:0;bottom:0;left:0}
+table{width:100%;border-collapse:collapse;font-size:12px} td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+td:first-child,th:first-child{text-align:left} th{color:var(--dim);font-weight:400;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+svg{display:block;width:100%;height:auto} .note{color:var(--dim);font-size:11px} .hide{display:none}
+input{background:#0b0f12;border:1px solid var(--line);color:var(--text);font:inherit;padding:6px;width:100%;border-radius:3px;margin:3px 0 8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>PROPBOT</h1>
+  <span id="prof" class="chip on">–</span><span id="st" class="chip">loading</span><span id="age" class="chip"></span>
+  <span class="sp"></span>
+  <button class="chip" onclick="load()">refresh</button><button class="chip" onclick="toggle('cfg')">settings</button>
+</header>
+<nav>
+  <button class="chip on" data-tab="now">now</button><button class="chip" data-tab="signals">signals</button>
+  <button class="chip" data-tab="book">book</button><button class="chip" data-tab="proof">proof</button>
+</nav>
+
+<div id="cfg" class="panel hide">
+  <div class="lbl">settings (stored only on this device)</div>
+  <div class="note">GitHub repo that runs PropBot (owner/name)</div><input id="c_repo">
+  <div class="note">ntfy server</div><input id="c_base">
+  <div class="note">ntfy control topic (your PropBot topic + "-ctl") - needed for the I BOUGHT / I SOLD buttons</div><input id="c_ctl">
+  <div class="note">ntfy access token (only if your topic is protected)</div><input id="c_tok" type="password">
+  <button class="chip on" onclick="saveCfg()">save</button>
+</div>
+
+<section id="t-now">
+  <div class="panel" id="action"></div>
+  <div class="panel">
+    <div class="row"><span class="lbl">challenge account</span><span class="note" id="lim"></span></div>
+    <div class="row"><span class="big" id="eq">–</span><span class="note" id="eqd"></span></div>
+    <div id="eqbar"></div>
+    <div class="kpis" style="margin-top:8px" id="acct"></div>
+  </div>
+  <div class="lbl" style="margin-top:12px">coins · a buy needs: daily trend up + one hour > 2x normal move + > 4x volume</div>
+  <div class="grid3" id="coins"></div>
+</section>
+
+<section id="t-signals" class="hide"><div class="panel"><div class="lbl">signals (latest first)</div><table id="sigs"></table></div></section>
+
+<section id="t-book" class="hide">
+  <div class="panel kpis" id="bk"></div>
+  <div class="panel"><div class="lbl">live vs backtest</div><table id="lvb"></table></div>
+  <div class="panel"><div class="lbl">manual tracker · tell the bot what you did in Kraken</div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;justify-content:flex-start">
+      <button class="chip g" onclick="ctl('bought')">i bought</button><button class="chip r" onclick="ctl('sold')">i sold</button>
+      <button class="chip" onclick="ctl('balance')">sync balance</button></div>
+    <div class="note" id="ctlnote" style="margin-top:6px">Paper mode follows every signal by itself. Use these in manual mode, or when your real fill differs.</div></div>
+  <div class="panel"><div class="lbl">closed trades</div><table id="closed"></table></div>
+</section>
+
+<section id="t-proof" class="hide">
+  <div class="panel"><div class="lbl" id="plabel">chance to reach the target</div><div class="kpis" id="pk"></div><div id="pcurve"></div>
+    <div class="note" id="pnote"></div></div>
+  <div class="panel"><div class="lbl">8 strategies tested · R per trade after costs · design / test period</div><table id="fam"></table></div>
+  <div class="panel"><div class="lbl">challenges one after another (backtest, prop starter rules)</div><div id="att"></div></div>
+  <div class="panel"><div class="lbl">stress tests · pass within 4 months / 1 year (prop starter rules)</div><table id="stress"></table></div>
+  <div class="panel"><div class="lbl">kraken funded (+12% / -3%, no leverage) · same engine</div><table id="fund"></table></div>
+</section>
+
+<script>
+const PROOF={"families":[{"name":"1 Multi-TF trend (4H)","IS_n":87,"IS_R":1.061,"OOS_n":62,"OOS_R":0.731,"OOS_PF":2.07,"OOS_win":34,"verdict":"kept (context/watch)"},{"name":"2 Breakout + retest (4H)","IS_n":174,"IS_R":0.4,"OOS_n":158,"OOS_R":0.128,"OOS_PF":1.17,"OOS_win":24,"verdict":"rejected: unstable walk-forward, alts negative"},{"name":"3 Trend pullback (4H)","IS_n":294,"IS_R":-0.083,"OOS_n":262,"OOS_R":-0.104,"OOS_PF":0.78,"OOS_win":35,"verdict":"rejected: loses in both periods"},{"name":"4 Momentum continuation (1H)","IS_n":123,"IS_R":0.567,"OOS_n":83,"OOS_R":0.66,"OOS_PF":2.04,"OOS_win":48,"verdict":"RECOMMENDED (tuned walk-forward: z 2.0, vol 4x)"},{"name":"5 Volatility expansion (1D)","IS_n":27,"IS_R":0.661,"OOS_n":24,"OOS_R":0.378,"OOS_PF":1.73,"OOS_win":38,"verdict":"rejected: too few trades (51 in 5y)"},{"name":"6 Relative-strength rotation (1D)","IS_n":101,"IS_R":0.328,"OOS_n":61,"OOS_R":0.485,"OOS_PF":2.86,"OOS_win":36,"verdict":"positive, but slow; 5-11% fails with manual stop times"},{"name":"7 Mean reversion RSI2 (4H)","IS_n":690,"IS_R":-0.047,"OOS_n":543,"OOS_R":-0.06,"OOS_PF":0.8,"OOS_win":62,"verdict":"rejected: loses in both periods"},{"name":"8 Hybrid regime Hull55 (1D)","IS_n":108,"IS_R":0.514,"OOS_n":59,"OOS_R":0.645,"OOS_PF":2.45,"OOS_win":37,"verdict":"positive, but slow and needs daily stop moves"}],"books":[{"book":"A trend 4H","risk":0.0075,"p30":2,"p60":8,"p90":16,"p120":26,"ci":"10-52","fail":0,"p365":47},{"book":"B momentum 1H","risk":0.0075,"p30":3,"p60":9,"p90":18,"p120":27,"ci":"11-53","fail":0,"p365":82},{"book":"D rotation 1D","risk":0.0075,"p30":0,"p60":2,"p90":6,"p120":8,"ci":"2-33","fail":0,"p365":32},{"book":"A+B","risk":0.0075,"p30":3,"p60":9,"p90":17,"p120":25,"ci":"9-51","fail":0,"p365":54},{"book":"A+B+D","risk":0.0075,"p30":2,"p60":10,"p90":19,"p120":26,"ci":"10-52","fail":0,"p365":46}],"daystop":[{"set":"rs all6","test":"base 00 UTC","p120":30,"fail":1},{"set":"rs all6","test":"stops set 20:00 UTC","p120":28,"fail":2},{"set":"hull+rs+trend cppi12","test":"base 00 UTC","p120":35,"fail":3},{"set":"hull+rs+trend cppi12","test":"stops set 20:00 UTC","p120":38,"fail":9},{"set":"trend_mtf B3","test":"base 00 UTC","p120":31,"fail":0},{"set":"trend_mtf B3","test":"stops set 20:00 UTC","p120":28,"fail":0}],"mc_all":{"30":[2.9,0.0],"60":[8.3,0.0],"90":[15.4,0.0],"120":[23.7,0.0],"365":[78.5,0.0]},"mc_oos":{"30":[5.1,0.0],"60":[12.2,0.0],"90":[19.7,0.0],"120":[27.0,0.0],"365":[75.8,0.0]},"rec":{"p30":0.038053649407361195,"p60":0.10667498440424204,"p90":0.2096069868995633,"p120":0.31503431066749843,"lo120":0.1356599945159685,"hi120":0.5740611458912795,"fail120":0.0,"p365":0.8799705449189985,"fail365":0.0,"med":172.08333333333334,"rate_month":3.7},"attempts":[{"start":"2022-02-01","result":"PASS","days":348,"trades":14,"eq":[["2022-02-01",10000],["2022-03-23",10047.73],["2022-03-28",10277.48],["2022-03-28",10586.1],["2022-04-12",10506.44],["2022-08-09",10495.2],["2022-08-10",10416.1],["2022-08-11",10582.59],["2022-08-14",10542.82],["2022-08-26",10463.66],["2022-11-08",10385.14],["2023-01-10",10408.11],["2023-01-12",10328.96],["2023-01-13",10740.13],["2023-01-14",11058.49]]},{"start":"2023-01-15","result":"PASS","days":282,"trades":38,"eq":[["2023-01-15",10000],["2023-01-21",9924.1],["2023-01-21",10100.87],["2023-01-25",10025.05],["2023-01-30",9949.52],["2023-01-30",9873.72],["2023-02-02",9941.38],["2023-02-02",10046.36],["2023-02-02",10102.99],["2023-02-14",10027.14],["2023-02-15",10064.03],["2023-02-16",10435.97],["2023-02-16",10477.25],["2023-03-14",10398.47],["2023-03-23",10320.36],["2023-03-23",10242.24],["2023-03-24",10165.22],["2023-03-30",10088.92],["2023-04-05",10183.87],["2023-04-11",10413.82],["2023-04-13",10621.92],["2023-04-14",10540.92],["2023-04-14",10460.49],["2023-04-26",10381.6],["2023-04-26",10302.72],["2023-05-06",10224.6],["2023-07-03",10259.43],["2023-07-06",10182.21],["2023-07-14",10253.12],["2023-07-14",10489.17],["2023-07-16",10482.26],["2023-08-14",10403.57],["2023-10-16",10325.07],["2023-10-17",10603.33],["2023-10-18",10523.4],["2023-10-21",10669.85],["2023-10-21",10735.77],["2023-10-22",10853.38],["2023-10-24",11697.09]]},{"start":"2023-10-25","result":"PASS","days":126,"trades":41,"eq":[["2023-10-25",10000],["2023-10-31",10217.02],["2023-11-01",10140.35],["2023-11-02",10063.13],["2023-11-05",9986.75],["2023-11-08",10013.26],["2023-11-09",9937.21],["2023-11-10",10129.75],["2023-11-11",10053.73],["2023-11-13",9978.2],["2023-11-16",9904.83],["2023-11-18",9910.4],["2023-11-23",9909.9],["2023-11-24",9846.66],["2023-12-01",9791.47],["2023-12-02",9778.85],["2023-12-02",9764.06],["2023-12-03",9784.34],["2023-12-03",9795.92],["2023-12-05",9914.77],["2023-12-05",9850.83],["2023-12-06",9961.38],["2023-12-07",9956.12],["2023-12-08",9992.59],["2023-12-21",10024.25],["2023-12-22",10067.39],["2023-12-23",9991.39],["2023-12-28",10071.55],["2024-01-03",10065.35],["2024-01-09",9988.96],["2024-01-10",10261.74],["2024-01-11",10184.74],["2024-01-11",10247.84],["2024-02-08",10443.26],["2024-02-10",10564.75],["2024-02-13",10483.9],["2024-02-13",10648.23],["2024-02-15",10692.83],["2024-02-15",10748.5],["2024-02-20",10667.8],["2024-02-20",10587.13],["2024-02-27",11099.94]]},{"start":"2024-02-28","result":"PASS","days":257,"trades":20,"eq":[["2024-02-28",10000],["2024-02-28",9924.95],["2024-02-29",10135.41],["2024-03-01",10234.88],["2024-03-12",10297.0],["2024-03-16",10419.63],["2024-04-09",10340.21],["2024-06-12",10262.31],["2024-06-12",10184.23],["2024-10-15",10285.38],["2024-10-15",10208.17],["2024-10-16",10308.19],["2024-10-21",10229.98],["2024-10-24",10302.29],["2024-10-30",10383.37],["2024-10-30",10400.59],["2024-11-05",10322.25],["2024-11-07",10558.44],["2024-11-07",10727.54],["2024-11-08",10825.29],["2024-11-11",11012.19]]},{"start":"2024-11-12","result":"PASS","days":275,"trades":33,"eq":[["2024-11-12",10000],["2024-11-12",9924.87],["2024-11-13",9859.53],["2024-11-18",9915.02],["2024-11-21",9850.64],["2024-11-22",9894.38],["2024-11-25",9833.17],["2024-12-04",9885.29],["2024-12-05",9892.47],["2024-12-16",9830.66],["2024-12-21",9878.62],["2025-01-07",9838.48],["2025-01-20",9784.31],["2025-05-07",9821.47],["2025-05-09",9895.31],["2025-05-09",10033.42],["2025-05-23",10097.65],["2025-05-29",10021.82],["2025-06-10",9945.14],["2025-06-10",10144.84],["2025-07-09",10068.64],["2025-07-11",10348.92],["2025-07-11",10561.32],["2025-07-14",10480.87],["2025-07-17",10653.78],["2025-07-22",10573.78],["2025-08-01",10494.19],["2025-08-08",10495.36],["2025-08-08",10579.55],["2025-08-09",10730.1],["2025-08-10",10649.06],["2025-08-11",10568.27],["2025-08-13",10765.03],["2025-08-13",11012.01]]},{"start":"2025-08-14","result":"STUCK","days":365,"trades":14,"eq":[["2025-08-14",10000],["2025-08-23",10066.06],["2025-08-23",10226.86],["2025-09-05",10149.75],["2025-09-09",10072.65],["2026-01-14",9996.5],["2026-01-14",10013.32],["2026-04-08",9960.29],["2026-04-14",10042.42],["2026-04-14",9996.66],["2026-04-18",10052.92],["2026-04-18",9977.4],["2026-04-23",9904.46],["2026-05-22",9840.83],["2026-08-04",9785.91]]},{"start":"2026-08-14","result":"PASS","days":7,"trades":2,"eq":[["2026-08-14",10000],["2026-08-19",9923.22],["2026-08-20",11148.99]]},{"start":"2026-08-21","result":"OPEN","days":365,"trades":21,"eq":[["2026-08-21",10000],["2026-08-21",9924.96],["2026-08-22",9859.57],["2026-08-22",9794.42],["2026-08-25",9745.89],["2026-09-04",9702.78],["2026-09-04",9659.85],["2026-09-04",9617.09],["2026-09-11",9590.8],["2026-09-12",9604.91],["2026-09-12",9607.99],["2026-09-19",9637.84],["2026-09-19",9687.66],["2026-09-19",9721.51],["2026-09-22",9805.7],["2026-09-22",9836.33],["2026-09-25",9782.57],["2026-09-30",9735.74],["2026-10-02",9694.79],["2026-10-02",9653.48],["2026-10-09",9674.65],["2026-10-20",9641.39]]}],"stress":[{"t":"Base (as built)","p120":32,"fail":0,"p365":88},{"t":"Stops fill 0.3% worse","p120":27,"fail":0,"p365":79},{"t":"Stops fill 0.5% worse","p120":24,"fail":0,"p365":76},{"t":"Stops fill 1.0% worse","p120":18,"fail":0,"p365":64},{"t":"Double commission","p120":27,"fail":0,"p365":83},{"t":"Slippage 0.10%/side","p120":24,"fail":0,"p365":77},{"t":"Enter 1 hour late","p120":26,"fail":0,"p365":83},{"t":"Risk 0.5%","p120":13,"fail":0,"p365":68},{"t":"Risk 1.0%","p120":24,"fail":0,"p365":62},{"t":"No profit protection","p120":32,"fail":0,"p365":88},{"t":"Stricter protection (+6.5/+8/+9%)","p120":27,"fail":0,"p365":82},{"t":"Internal day stop 1%","p120":15,"fail":0,"p365":44},{"t":"Neighbour {'z': 2.5}","p120":17,"fail":0,"p365":62},{"t":"Neighbour {'vmult': 3.0}","p120":31,"fail":0,"p365":81},{"t":"Neighbour {'stop_atr': 1.5}","p120":30,"fail":0,"p365":85},{"t":"Neighbour {'stop_atr': 2.5}","p120":20,"fail":0,"p365":84},{"t":"Neighbour {'hold': 18}","p120":26,"fail":0,"p365":89},{"t":"Neighbour {'hold': 36}","p120":39,"fail":0,"p365":86},{"t":"All 6 coins","p120":29,"fail":0,"p365":62}],"funded":[{"book":"A trend_mtf B3","risk":0.002,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":22,"fail365":0},{"book":"A trend_mtf B3","risk":0.0035,"p30":1,"p60":5,"p90":9,"p120":13,"fail120":0,"p365":32,"fail365":0},{"book":"A trend_mtf B3","risk":0.005,"p30":1,"p60":5,"p90":10,"p120":16,"fail120":0,"p365":32,"fail365":0},{"book":"B momentum_vs B3","risk":0.002,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":0,"fail365":0},{"book":"B momentum_vs B3","risk":0.0035,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":0,"fail365":0},{"book":"B momentum_vs B3","risk":0.005,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":4,"fail365":0},{"book":"D rs_rotation all6","risk":0.002,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":0,"fail365":0},{"book":"D rs_rotation all6","risk":0.0035,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":1,"fail365":0},{"book":"D rs_rotation all6","risk":0.005,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":11,"fail365":0},{"book":"A+B+D","risk":0.002,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":2,"fail365":0},{"book":"A+B+D","risk":0.0035,"p30":0,"p60":0,"p90":0,"p120":0,"fail120":0,"p365":29,"fail365":0},{"book":"A+B+D","risk":0.005,"p30":1,"p60":4,"p90":8,"p120":13,"fail120":0,"p365":33,"fail365":0}],"hist":{"n":206},"period":"Feb 2022 - Nov 2026 (OKX 1H; design to Oct 2024, test after)","funded_rec":{"p30":0.0,"p60":0.03,"p90":0.08,"p120":0.12,"lo120":0.03,"hi120":0.37,"fail120":0.0,"p365":0.67,"fail365":0.0,"med":217.2083333333333,"rate_month":3.7}};
+const C={g:"#22c55e",r:"#ef4444",a:"#f59e0b",t:"#14b8a6",d:"#6f7d87",l:"#1e262c",x:"#d7dee3"};
+const $=id=>document.getElementById(id), money=v=>(v<0?"-":"")+"$"+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+const px=v=>"$"+(v>=1000?v.toLocaleString("en-US",{maximumFractionDigits:0}):v>=10?v.toFixed(2):v.toFixed(4));
+const cy=iso=>new Date(iso).toLocaleString("en-GB",{timeZone:"Asia/Nicosia",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+const LS=k=>{try{return localStorage.getItem("pb_"+k)}catch(e){return null}}, LSs=(k,v)=>{try{localStorage.setItem("pb_"+k,v)}catch(e){}};
+const cfg=()=>({repo:LS("repo")||"olamprou01-droid/tradebot-app",base:LS("base")||"https://ntfy.sh",ctl:LS("ctl")||"tradebot-eth-7k2m9x-funded-ctl",tok:LS("tok")||""});
+function toggle(id){$(id).classList.toggle("hide");const c=cfg();$("c_repo").value=c.repo;$("c_base").value=c.base;$("c_ctl").value=c.ctl;$("c_tok").value=c.tok}
+function saveCfg(){LSs("repo",$("c_repo").value.trim());LSs("base",$("c_base").value.trim());LSs("ctl",$("c_ctl").value.trim());LSs("tok",$("c_tok").value.trim());$("cfg").classList.add("hide");load()}
+document.querySelectorAll("nav .chip").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav .chip").forEach(x=>x.classList.toggle("on",x===b));
+  ["now","signals","book","proof"].forEach(t=>$("t-"+t).classList.toggle("hide",t!==b.dataset.tab))});
+let B=null;
+
+async function load(){
+  const r=cfg().repo; let s=null, err="";
+  try{const q=await fetch(`https://api.github.com/repos/${r}/contents/book.json?ref=propdata`,{headers:{Accept:"application/vnd.github.raw+json"},cache:"no-store"});
+      if(q.ok) s=await q.json(); else err="GitHub "+q.status}catch(e){err=String(e)}
+  if(!s){try{const q=await fetch(`https://raw.githubusercontent.com/${r}/propdata/book.json?t=${Date.now()}`);if(q.ok){s=await q.json();err=""}}catch(e){}}
+  if(!s){$("st").textContent="no data";$("st").className="chip a";$("action").innerHTML=`<div class="act a">Can't read the bot yet</div><div class="note">${err||"book.json not found"} · repo ${r} · branch propdata. Has the propbot workflow run?</div>`;return}
+  B=s; render(s);
+}
+
+function render(s){
+  const start=s.start, prof=s.profile||"", isProp=prof.startsWith("prop");
+  const tgtPct=isProp?(prof.includes("intermediate")?0.12:prof.includes("advanced")?0.09:0.10):0.12, ddPct=isProp?(prof.includes("intermediate")?0.05:prof.includes("advanced")?0.03:0.06):0.03;
+  const TGT=start*(1+tgtPct), FLOOR=start*(1-ddPct), E=s.equity;
+  $("prof").textContent=prof.replace(/_/g," ")+" · "+(s.mode||"paper");
+  $("st").textContent=s.status.toLowerCase(); $("st").className="chip "+(s.status==="PASSED"?"g":s.status==="RUNNING"?"on":"r");
+  const mins=s.updated?Math.round((Date.now()-new Date(s.updated))/6e4):null;
+  $("age").textContent=mins==null?"":mins<=15?`${mins}m ago`:`bot silent ${mins<120?mins+"m":Math.round(mins/60)+"h"}`; $("age").className="chip "+(mins>15?"a":"");
+  // action
+  const open=Object.values(s.open||{}), now=Date.now();
+  const valid=(s.signals||[]).filter(x=>x.state==="VALID ENTRY"&&new Date(x.expires)>now&&!(s.open||{})[x.coin]);
+  let a="";
+  if(s.status==="PASSED") a=`<div class="act g">Target reached. Close everything and stop.</div>`;
+  else if(s.status!=="RUNNING") a=`<div class="act r">${s.status}: no new trades.</div>`;
+  if(valid.length) a+=valid.map(v=>`<div class="act g">BUY ${v.coin} now · ${money(v.order.notional)}</div><div>${isProp?"Stop Loss order at":"sell at once if price ≤"} <b>${px(v.stop)}</b> · buy before ${cy(v.expires)}</div>`).join("");
+  a+=open.map(p=>{const left=(new Date(p.exit_due)-now)/36e5;return `<div class="row" style="margin-top:6px"><span class="act t">HOLD ${p.coin}</span><span class="${(p.upnl||0)>=0?"g":"r"}">${money(p.upnl||0)}</span></div>
+    <div>${isProp?"Stop Loss at":"sell at once if price ≤"} <b>${px(p.stop)}</b> · otherwise sell <b>${cy(p.exit_due)}</b> <span class="${left<1?"a":"d"}">(${left>0?left.toFixed(1)+"h":"now"})</span></div>
+    <div class="note">bought ${px(p.entry)} · ${money(p.notional)} · max loss ${money(p.risk_usd)}${(s.mode||"paper")==="paper"?" · assumed taken":""}</div>
+    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button class="chip" onclick="ctlSend('skip:${p.id}')">i didn't buy</button><button class="chip r" onclick="ctl('sold')">i sold</button></div>`}).join("");
+  if(!a) a=`<div class="act">No trade. Wait for a push.</div><div class="note">The bot runs on GitHub 24/7 and checks every minute. Signals are rare (about 4 a month), none while a coin's daily trend is off.</div>`;
+  const recentErr=(s.warnings||[]).filter(w=>w.includes("data ")).slice(-1)[0];
+  if(recentErr&&mins!=null&&mins<15&&!s.prices) a=`<div class="note a">Kraken data problem: ${recentErr}</div>`+a;
+  $("action").innerHTML=a;
+  // account
+  const g=E/start-1, today=E-(s.day_balance||start);
+  $("eq").textContent=money(E); $("eq").className="big "+(g>=0?"g":"r");
+  $("eqd").textContent=`${g>=0?"+":""}${(g*100).toFixed(2)}% · ${money(TGT-E)} to target · ${money(E-FLOOR)} above the line`;
+  $("lim").textContent=`target ${money(TGT)} · max loss line ${money(FLOOR)}`;
+  $("eqbar").innerHTML=eqBar(E,start,FLOOR,TGT);
+  const riskUsd=0.0075*start, dayStop=0.02*start;
+  $("acct").innerHTML=kpi("start",money(start))+kpi("today",money(today),today>=0?"g":today<-dayStop*0.5?"a":"r")+kpi("internal day stop",money(-dayStop))+kpi("risk / trade",money(riskUsd));
+  // coins
+  const w=s.watch||{};
+  $("coins").innerHTML=Object.keys(w).map(c=>coin(c,w[c],(s.open||{})[c])).join("")||`<div class="note">waiting for the first run</div>`;
+  // signals
+  const sg=(s.signals||[]).slice().reverse();
+  $("sigs").innerHTML="<tr><th>time</th><th>coin</th><th>state</th><th>detail</th></tr>"+(sg.length?sg.slice(0,60).map(x=>{
+    const exp=x.expires&&new Date(x.expires)<now&&x.state!=="NO TRADE";
+    const col=x.state==="VALID ENTRY"?"g":x.state==="NO TRADE"?"r":x.state==="WATCHLIST"?"d":"a";
+    const det=x.state==="VALID ENTRY"?`${money(x.order.notional)} · stop ${px(x.stop)} · ${x.z}x / ${x.vol_x}x · conf ${x.confidence}`:x.state==="NO TRADE"?x.reason:`${x.z}x move · ${x.vol_x}x volume`;
+    return `<tr><td>${cy(x.t)}</td><td>${x.coin}</td><td class="${col}">${x.state.toLowerCase()}${exp?' <span class="d">(expired)</span>':""}</td><td class="note">${det}</td></tr>`}).join(""):`<tr><td colspan="4" class="d">No signals yet.</td></tr>`);
+  // book
+  const cl=(s.closed||[]).slice().reverse(), n=cl.length, w_=cl.filter(t=>t.pnl>0), l_=cl.filter(t=>t.pnl<=0);
+  const gp=w_.reduce((x,t)=>x+t.pnl,0), gl=-l_.reduce((x,t)=>x+t.pnl,0), avgR=n?cl.reduce((x,t)=>x+t.R,0)/n:0;
+  $("bk").innerHTML=kpi("trades",n)+kpi("win rate",n?Math.round(w_.length/n*100)+"%":"–")+kpi("profit factor",gl>0?(gp/gl).toFixed(2):"–")+kpi("p&l",money(gp-gl),gp-gl>=0?"g":"r");
+  $("lvb").innerHTML="<tr><th></th><th>live (paper)</th><th>backtest</th></tr>"+
+    `<tr><td>trades</td><td>${n}</td><td>206 (5 yrs)</td></tr><tr><td>win rate</td><td>${n?Math.round(w_.length/n*100)+"%":"–"}</td><td>50%</td></tr>`+
+    `<tr><td>avg R per trade</td><td>${n?avgR.toFixed(2):"–"}</td><td>0.60</td></tr><tr><td>verdict</td><td colspan="2" class="note">${n<30?`Too few trades to judge (${n} of the 30 needed).`:avgR>0.2?"On track with the backtest.":"Below the backtest - review before paying."}</td></tr>`;
+  $("closed").innerHTML="<tr><th>coin</th><th>closed</th><th>exit</th><th>R</th><th>p&l</th></tr>"+(n?cl.map(t=>`<tr><td>${t.coin}</td><td>${cy(t.t_out)}</td><td class="d">${t.reason}</td><td>${t.R.toFixed(1)}</td><td class="${t.pnl>=0?"g":"r"}">${money(t.pnl)}</td></tr>`).join(""):`<tr><td colspan="5" class="d">None yet.</td></tr>`);
+}
+
+function eqBar(E,S,F,T){const W=600,x=v=>Math.max(0,Math.min(W,(v-F)/(T-F)*W));
+  return `<svg viewBox="0 0 ${W} 34"><rect x="0" y="10" width="${W}" height="8" fill="#151b20"/><rect x="${Math.min(x(S),x(E))}" y="10" width="${Math.abs(x(E)-x(S))}" height="8" fill="${E>=S?C.g:C.r}"/>
+  <line x1="${x(S)}" x2="${x(S)}" y1="4" y2="24" stroke="${C.d}"/><circle cx="${x(E)}" cy="14" r="5" fill="${C.x}"/>
+  <text x="0" y="33" fill="${C.r}" font-size="11">${money(F)}</text><text x="${x(S)}" y="33" fill="${C.d}" font-size="11" text-anchor="middle">${money(S)}</text><text x="${W}" y="33" fill="${C.g}" font-size="11" text-anchor="end">${money(T)}</text></svg>`}
+function gauge(l,v,need,u){const f=Math.max(0,Math.min(1,need>0?v/need:0)),ok=v>=need,col=ok?C.g:f>.66?C.a:C.d;
+  return `<div class="row note"><span>${l}</span><span style="color:${col}">${v.toFixed(u==="x"?1:2)}${u} / ${need.toFixed(u==="x"?0:2)}${u}</span></div><div class="bar"><i style="width:${f*100}%;background:${col}"></i></div>`}
+function spark(a,col){if(!a||a.length<2)return"";const W=200,H=34,mn=Math.min(...a),mx=Math.max(...a),y=v=>H-2-(v-mn)/((mx-mn)||1)*(H-4);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:34px;margin:6px 0"><polyline points="${a.map((v,i)=>`${(i/(a.length-1)*W).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`}
+function coin(c,w,held){const st=held?"held":w.state.toLowerCase(), cls=held?"on":w.state==="VALID ENTRY"?"g":w.state==="ENTRY SETUP"?"a":w.state==="WATCHLIST"?"a":w.up?"":"";
+  const move=Math.max(0,w.z)*(w.need_move_pct/2.0);
+  return `<div class="panel"><div class="row"><span class="act">${c}</span><span class="chip ${cls}">${w.up?st:"trend off"}</span></div>
+  <div class="row"><span>${px(w.price)}</span><span class="note">48h</span></div>${spark(w.spark,w.up?C.t:C.d)}
+  ${gauge("last hour",move,w.need_move_pct,"%")}${gauge("volume",w.vol_x,4,"x")}<div class="note">closed ${cy(new Date(new Date(w.bar).getTime()+36e5).toISOString())}</div></div>`}
+const kpi=(l,v,c="")=>`<div><div class="lbl">${l}</div><div class="big ${c}">${v}</div></div>`;
+
+async function ctlSend(body){const c=cfg();const h={};if(c.tok)h.Authorization="Bearer "+c.tok;
+  try{const r=await fetch(`${c.base.replace(/\/$/,"")}/${c.ctl}`,{method:"POST",body,headers:h});alert(r.ok?`Sent. The bot applies it within a minute.`:`ntfy said ${r.status}`)}catch(e){alert("Couldn't reach ntfy: "+e)}}
+async function ctl(kind){
+  const c=cfg(); if(!c.ctl){$("ctlnote").textContent="Set the ntfy control topic in settings first.";toggle("cfg");return}
+  let body="";
+  if(kind==="bought"){const v=(B&&B.signals||[]).filter(x=>x.state==="VALID ENTRY").slice(-1)[0];if(!v){$("ctlnote").textContent="No VALID ENTRY to confirm.";return}
+    const p=prompt(`Fill price for ${v.coin}?`,v.entry.toFixed(2)); if(!p)return; const u=prompt("USD amount bought?",v.order.notional.toFixed(0)); if(!u)return; body=`bought:${v.id}:${+p}:${+u}`}
+  if(kind==="sold"){const coins=Object.keys(B&&B.open||{}); if(!coins.length){$("ctlnote").textContent="No open position.";return}
+    const k=coins.length===1?coins[0]:prompt(`Which coin? (${coins.join(", ")})`,coins[0]); const p=prompt(`Sell price for ${k}?`,(B.open[k].last||B.open[k].entry).toFixed(2)); if(!p)return; body=`sold:${k}:${+p}`}
+  if(kind==="balance"){const v=prompt("Balance shown in the Kraken challenge account (USD)?");if(!v)return; body=`balance:${+v}`}
+  const h={}; if(c.tok) h.Authorization="Bearer "+c.tok;
+  try{const r=await fetch(`${c.base.replace(/\/$/,"")}/${c.ctl}`,{method:"POST",body,headers:h}); $("ctlnote").textContent=r.ok?`Sent "${body}". The bot applies it within 5 minutes.`:`ntfy said ${r.status}`}catch(e){$("ctlnote").textContent="Couldn't reach ntfy: "+e}
+}
+
+function proof(){
+  const P=PROOF; if(!P) return; const R=(B&&!(B.profile||"").startsWith("prop"))||!B?P.funded_rec:P.rec;
+  $("pk").innerHTML=kpi("1 month",Math.round(R.p30*100)+"%")+kpi("2 months",Math.round(R.p60*100)+"%")+kpi("3 months",Math.round(R.p90*100)+"%")+kpi("4 months",Math.round(R.p120*100)+"%","t");
+  // pass curve
+  const pts=[[0,0],[30,R.p30],[60,R.p60],[90,R.p90],[120,R.p120],[365,R.p365]], W=600,H=150, x=d=>d/365*W, y=p=>H-p*H;
+  let g=`<svg viewBox="0 0 ${W} ${H+18}"><line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="${C.l}"/>`;
+  g+=`<polyline fill="none" stroke="${C.t}" stroke-width="2" points="${pts.map(p=>`${x(p[0])},${y(p[1])}`).join(" ")}"/>`;
+  pts.slice(1).forEach(p=>{g+=`<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3" fill="${C.t}"/><text x="${x(p[0])}" y="${y(p[1])-6}" fill="${C.x}" font-size="11" text-anchor="${p[0]>300?"end":"middle"}">${Math.round(p[1]*100)}%</text>`});
+  [30,60,90,120,365].forEach(d=>g+=`<text x="${x(d)}" y="${H+14}" fill="${C.d}" font-size="10" text-anchor="${d>300?"end":"middle"}">${d}d</text>`);
+  $("pcurve").innerHTML=g+"</svg>";
+  $("plabel").textContent=R===P.funded_rec?"chance to reach +12% · kraken funded $10k (0.3% slower manual stop exits included)":"chance to reach +10% · kraken prop starter $10k";
+  $("pnote").textContent=`From a challenge started on any day ${P.period}. Fails (crossing the loss line): ${Math.round(R.fail120*100)}% in 4 months, ${Math.round(R.fail365*100)}% in a year. 4-month range ${Math.round(R.lo120*100)}-${Math.round(R.hi120*100)}%. Median time to pass ${Math.round(R.med)} days. Backtest, not a promise.`;
+  $("fam").innerHTML="<tr><th>strategy</th><th>trades</th><th>R design</th><th>R test</th><th>verdict</th></tr>"+P.families.map(f=>
+    `<tr><td>${f.name}</td><td>${f.IS_n}/${f.OOS_n}</td><td class="${f.IS_R>0?"g":"r"}">${(+f.IS_R).toFixed(2)}</td><td class="${f.OOS_R>0?"g":"r"}">${(+f.OOS_R).toFixed(2)}</td><td class="note">${f.verdict}</td></tr>`).join("");
+  // attempts
+  const at=P.attempts, all=at.flatMap(a=>a.eq.map(e=>+new Date(e[0]))), t0=Math.min(...all), t1=Math.max(...all), lo=9300, hi=11300, H2=160, X=t=>(t-t0)/(t1-t0)*W, Y=v=>H2-(v-lo)/(hi-lo)*H2;
+  let e=`<svg viewBox="0 0 ${W} ${H2+16}"><line x1="0" x2="${W}" y1="${Y(11000)}" y2="${Y(11000)}" stroke="${C.g}" stroke-dasharray="4 4"/><line x1="0" x2="${W}" y1="${Y(9400)}" y2="${Y(9400)}" stroke="${C.r}" stroke-dasharray="4 4"/><line x1="0" x2="${W}" y1="${Y(10000)}" y2="${Y(10000)}" stroke="${C.l}"/>`;
+  at.forEach(a=>{const col=a.result==="PASS"?C.g:a.result==="FAIL"?C.r:C.a; e+=`<polyline fill="none" stroke="${col}" stroke-width="1.5" points="${a.eq.map((p,i)=>{const xx=X(+new Date(p[0])).toFixed(1),yy=Y(p[1]).toFixed(1),yp=i?Y(a.eq[i-1][1]).toFixed(1):yy;return `${xx},${yp} ${xx},${yy}`}).join(" ")}"/>`;
+    e+=`<text x="${X(+new Date(a.start))+2}" y="${H2+13}" fill="${C.d}" font-size="10">${a.start.slice(2,7)}</text>`});
+  $("att").innerHTML=e+`</svg><div class="note"><span class="g">■</span> passed <span class="a">■</span> stuck a year / still running · ${at.filter(a=>a.result==="PASS").length} of ${at.length} attempts passed, none failed · days to pass: ${at.filter(a=>a.result==="PASS").map(a=>a.days).join(", ")}</div>`;
+  $("stress").innerHTML="<tr><th>test</th><th>4 months</th><th>1 year</th><th>fail</th></tr>"+P.stress.map(s=>`<tr><td>${s.t}</td><td>${s.p120}%</td><td class="${s.p365>=60?"g":"a"}">${s.p365}%</td><td class="${s.fail>0?"r":"d"}">${s.fail}%</td></tr>`).join("");
+  $("fund").innerHTML="<tr><th>book</th><th>risk</th><th>4 months</th><th>1 year</th></tr>"+P.funded.filter(f=>f.risk===0.002||f.risk===0.005).map(f=>`<tr><td>${f.book}</td><td>${(f.risk*100).toFixed(2)}%</td><td>${f.p120}%</td><td>${f.p365}%</td></tr>`).join("")+
+    `<tr><td colspan="4" class="note">At 0.2% risk the Funded +12% target is out of reach in 1-4 months on every strategy tested.</td></tr>`;
+}
+proof(); load().then(proof); setInterval(load,60*1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+# PropBot - Kraken Funded $10k signal bot, running 24/7 on GitHub (free on a public repo). Signal-only: never places orders.
+# Each job checks the market every minute for ~5h40m; the cron keeps the next job queued behind it, so there is no gap.
+# State is saved on its own branch `propdata`, so it never touches TradeBot's `data` branch.
+name: propbot
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      selftest:
+        description: "Self-test: check Kraken + ntfy for real and send a test push to the phone"
+        type: boolean
+        default: true
+  push:
+    paths: ["propbot_bot.py", ".github/workflows/propbot.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: propbot
+  cancel-in-progress: false      # the next run waits behind the running loop (no gap, no double alerts)
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    env:
+      NTFY_BASE_URL: ${{ secrets.NTFY_BASE_URL || 'https://ntfy.sh' }}
+      NTFY_TOPIC: ${{ secrets.PROPBOT_NTFY_TOPIC || 'tradebot-eth-7k2m9x' }}
+      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+      ACCOUNT_PROFILE: ${{ vars.ACCOUNT_PROFILE || 'funded_10k' }}
+      PROPBOT_MODE: ${{ vars.PROPBOT_MODE || 'paper' }}
+      PROPBOT_STATE_DIR: propstate
+    steps:
+      - uses: actions/checkout@v5
+      - name: state branch (created on the first run)
+        run: |
+          git config --global user.name propbot
+          git config --global user.email propbot@users.noreply.github.com
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads origin propdata >/dev/null; then
+            git clone -q --depth 5 --branch propdata "$URL" propstate
+          else
+            mkdir propstate && cd propstate && git init -q -b propdata && echo "PropBot state" > README.md && git add -A && git commit -qm init \
+              && git remote add origin "$URL" && git push -q origin propdata
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: offline tests (must pass before anything runs)
+        run: python propbot_bot.py --tests
+      - name: self-test with real Kraken + ntfy (manual runs and new uploads)
+        if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.selftest)
+        run: python propbot_bot.py --selftest
+      - name: watch the market every minute
+        run: python propbot_bot.py --loop 340
+      - name: tell the phone if anything failed
+        if: failure()
+        run: |
+          python - <<'EOF'
+          import os, json, urllib.request
+          h = {"Content-Type": "application/json"}
+          if os.environ.get("NTFY_TOKEN"): h["Authorization"] = "Bearer " + os.environ["NTFY_TOKEN"]
+          body = json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": "[SYSTEM] bot run FAILED", "priority": 5,
+                             "message": "A run failed (tests, Kraken or ntfy). The next scheduled run retries in 30 min. Open GitHub > Actions > propbot to see why."}).encode()
+          urllib.request.urlopen(urllib.request.Request(os.environ["NTFY_BASE_URL"].rstrip("/") + "/", data=body, headers=h), timeout=15)
+          EOF
