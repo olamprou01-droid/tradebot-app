@@ -36,7 +36,9 @@ RISK_CUT_BELOW, RISK_CUT = -0.025, 0.005            # below -2.5% on the attempt
 START_EQUITY = config.FUNDED["start_equity"]
 LIMITS = dict(daily=0.010, weekly=0.015, halt=0.050, kill=0.060, target=0.10)   # Kraken Prop STARTER: 10% target, 6% max DD static, 3% daily (memo §16)
 MAX_OPEN = 2                                        # across both strategies, one position per coin
-REV_STOP, REV_ROI_ANY, REV_ROI_AFTER1 = 0.03, 0.05, 0.01   # S002: fixed 3% stop; exit at +5% any time, +1% after 1 closed bar, or on its sell signal
+REV_STOP, REV_ROI_ANY = 0.03, 0.05   # S002: fixed 3% stop; exit when a 1H bar closes +5% or better, or on its sell signal.
+# (Until 2026-11-24 the live rule also took +1% after one hour. The replay never used that: its evidence is for +5% only —
+#  +0.57R/trade and 11 pass/3 kill combined, vs +0.16R and 8/3 with the +1% rule. Live now matches the tested rule. Memo §17.)
 PROPOSAL_TIMEOUT_MIN = 30                   # cloud bot runs every ~10 min, so 3 chances to answer
 DON, ATR_MULT, TRAIL_ATR, TIME_STOP_BARS = 20, 2.0, 3.0, 180
 FUNDING_4H = 0.000055                       # Kraken Prop swap: 0.033%/day charged per 4h rollover, on notional
@@ -216,7 +218,7 @@ def make_proposal(st, sig):
 
 
 def push_proposal(p):
-    kind = "1H washout, exit +1-5% or sell signal" if p.get("strat") == "S002" else "4H breakout, trailing exit, no fixed TP"
+    kind = "1H washout, exit at +5% or on its sell signal" if p.get("strat") == "S002" else "4H breakout, trailing exit, no fixed TP"
     body = (f"{STRAT_NAME.get(p.get('strat'), 'TREND')} strategy · BUY {p['pair']} @ {P(p['entry'])}\nORDER SIZE: {p['notional']:.0f} USD = {p['pct_of_account']:.1f}% of account ({p['size']} {p['pair'][:-3]})\n"
             f"STOP {P(p['stop'])} ({(p['stop']/p['entry']-1)*100:+.1f}%) · {kind}\nmax loss ${p['max_loss']:.0f}\n"
             f"volume {p['vol_ratio']:.1f}× avg · ATR {p['atr_pct']:.1f}%\nNo answer in {PROPOSAL_TIMEOUT_MIN} min = accept (paper)")
@@ -290,7 +292,7 @@ def mark_positions(st, bar_closed_pairs, bar_closed_1h=()):
                 if pos["pair"] in bar_closed_1h:                   # reversal: evaluated on each closed 1H bar
                     b.DATA = LIVE; h1 = S.load_tf(pos["pair"], 60); j = len(h1) - 2; c = float(h1.close.iloc[j])
                     pos["bars"] = pos.get("bars", 0) + 1; gain = c / pos["entry"] - 1
-                    if gain >= REV_ROI_ANY or (pos["bars"] >= 1 and gain >= REV_ROI_AFTER1): rev_exit = ("roi", c)
+                    if gain >= REV_ROI_ANY: rev_exit = ("roi", c)
                     else:
                         _, sell = PT.s002(h1)
                         if bool(sell.iloc[j]): rev_exit = ("sell_signal", c)
@@ -325,7 +327,7 @@ def position_alerts(pos, bid):
     done = set(pos.get("milestones", []))
     for m in MILESTONES:
         if pos["R_now"] >= m and m not in done:
-            done.add(m); notify(head(pos.get("strat"), pair, pos["entry"], f"🏁 +{m}R @ {P(bid)}"), f"+{pos['upnl']:.0f} USD. " + ("Reversal trade: it exits at +1% after the first closed hour, +5% any time, or on its sell signal — I will tell you." if pos.get("strat") == "S002" else f"No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so."), tags=stag(pos.get("strat"), "checkpoint"))
+            done.add(m); notify(head(pos.get("strat"), pair, pos["entry"], f"🏁 +{m}R @ {P(bid)}"), f"+{pos['upnl']:.0f} USD. " + ("Reversal trade: it exits when an hourly bar closes +5% or better, or on its sell signal — I will tell you." if pos.get("strat") == "S002" else f"No fixed TP in this strategy — the trail ({P(pos['stop'])}) does the exit. Take partial profit here only if you decide so."), tags=stag(pos.get("strat"), "checkpoint"))
     pos["milestones"] = sorted(done)
 
 
