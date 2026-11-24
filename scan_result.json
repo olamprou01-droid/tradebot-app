@@ -1,0 +1,75 @@
+{
+ "ts": 1795509981.1107683,
+ "since": 1794470400,
+ "since_utc": "2026-11-12 08:00",
+ "pairs": {
+  "ETHUSD": {
+   "trend_signals": [],
+   "reversal_signals": [
+    {
+     "signal_at": "2026-11-20 20:00",
+     "price": 1605.82,
+     "entry": 1606.1711699999998,
+     "stop": 1557.9860348999998,
+     "now_or_exit": 1557.9860348999998,
+     "status": "closed (stop) 2026-11-21 04:00",
+     "result_R": -1.0
+    }
+   ],
+   "price": 1700.45,
+   "daily_trend_up_now": false,
+   "bars_4h_with_trend_up": 0,
+   "bars_4h_total": 74,
+   "trigger_now": 1843.93,
+   "max_reversal_conditions": 4,
+   "hours_with_3_of_4": 8,
+   "data_until": "2026-11-24 08:00"
+  },
+  "SOLUSD": {
+   "trend_signals": [],
+   "reversal_signals": [],
+   "price": 71.48,
+   "daily_trend_up_now": false,
+   "bars_4h_with_trend_up": 0,
+   "bars_4h_total": 74,
+   "trigger_now": 78.48,
+   "max_reversal_conditions": 3,
+   "hours_with_3_of_4": 13,
+   "data_until": "2026-11-24 08:00"
+  },
+  "LINKUSD": {
+   "trend_signals": [],
+   "reversal_signals": [
+    {
+     "signal_at": "2026-11-20 18:00",
+     "price": 8.37695,
+     "entry": 8.378005265999999,
+     "stop": 8.12666510802,
+     "now_or_exit": 8.12666510802,
+     "status": "closed (stop) 2026-11-21 04:00",
+     "result_R": -1.0
+    }
+   ],
+   "price": 9.09838,
+   "daily_trend_up_now": false,
+   "bars_4h_with_trend_up": 0,
+   "bars_4h_total": 74,
+   "trigger_now": 9.54542,
+   "max_reversal_conditions": 4,
+   "hours_with_3_of_4": 12,
+   "data_until": "2026-11-24 08:00"
+  },
+  "XRPUSD": {
+   "trend_signals": [],
+   "reversal_signals": [],
+   "price": 0.94632,
+   "daily_trend_up_now": false,
+   "bars_4h_with_trend_up": 0,
+   "bars_4h_total": 74,
+   "trigger_now": 1.02601,
+   "max_reversal_conditions": 3,
+   "hours_with_3_of_4": 12,
+   "data_until": "2026-11-24 08:00"
+  }
+ }
+}
