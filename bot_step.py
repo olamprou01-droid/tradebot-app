@@ -31,11 +31,11 @@ if os.getenv("TEST_ALERT") or flag.exists():
             {"action": "http", "label": "REJECT", "url": f"{bot.NTFY}/{bot.NTFY_CTL}", "method": "POST", "body": "reject:testonly", "clear": True}]
     T = "TEST ONLY — not a real signal.\n"
     bot.notify(bot.head("S4", "ETHUSD", 2274.7, "📈 BUY PROPOSAL"), T + "TREND strategy · BUY ETHUSD @ 2,274.7\nORDER SIZE: 3245 USD = 32.5% of account (1.4267 ETH)\nSTOP 2,206.4 (-3.0%) · 4H breakout, trailing exit, no fixed TP\nmax loss $100", actions=acts, tags="trend,proposal,test")
-    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔄 BUY PROPOSAL"), T + "REVERSAL strategy · BUY SOLUSD @ 90.12\nORDER SIZE: 3330 USD = 33.3% of account (36.95 SOL)\nSTOP 87.42 (-3.0%) · 1H washout, exit +1-5% or sell signal\nmax loss $100", actions=acts, tags="reversal,proposal,test")
+    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔄 BUY PROPOSAL"), T + "REVERSAL strategy · BUY SOLUSD @ 90.12\nORDER SIZE: 3330 USD = 33.3% of account (36.95 SOL)\nSTOP 87.42 (-3.0%) · 1H washout, exit at +5% or on its sell signal\nmax loss $100", actions=acts, tags="reversal,proposal,test")
     bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🟢 OPENED"), T + "3245 USD (32.5% of account) · now place a STOP LOSS order at 2,206.4 (-3.0%)", tags="trend,opened,test")
     bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🔵 MOVE STOP → 2,310.0"), T + "Edit your stop-loss order to 2,310.0 (+0.5R locked in). Price 2,415.0.", tags="trend,stop-moved,test")
     bot.notify(bot.head("S4", "ETHUSD", 2274.7, "🟡 NEAR STOP 2,310.0"), T + "Price 2,322.0 is 0.52% above the stop 2,310.0. Close at market if it trades through it.", tags="trend,near-stop,test")
-    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔴 CLOSE NOW @ 91.05 (ROI)"), T + "roi · exit at market now\nentry 90.12 → exit 91.05\nnet +31 USD (+0.3R)", tags="reversal,close,test")
+    bot.notify(bot.head("S002", "SOLUSD", 90.12, "🔴 CLOSE NOW @ 94.70 (ROI)"), T + "roi · exit at market now\nentry 90.12 → exit 94.70\nnet +166 USD (+1.7R)", tags="reversal,close,test")
     bot.log("test alerts sent")
 t0 = time.time()
 bot.step(st, first=True)                             # force=True publishes every run (the workflow commits only if something changed)
